@@ -25,8 +25,28 @@ The icon SHALL be an outlined cup while no session is active and a filled cup wh
 - **WHEN** a timed session reaches its end time
 - **THEN** the icon becomes an outlined cup without the user opening the menu
 
+### Requirement: Time left in the menu bar
+While a session is active, the menu bar SHALL show text next to the cup: "∞" for an indefinite session, or the time left for a timed session. The time left SHALL be rounded up to the next whole minute and written in hours and minutes (for example "42m" or "1h 5m"). It SHALL count down as each minute passes, without the user opening the menu. No text SHALL be shown while no session is active.
+
+#### Scenario: Indefinite session
+- **WHEN** an indefinite session is active
+- **THEN** the menu bar shows the filled cup followed by "∞"
+
+#### Scenario: Timed session counts down
+- **WHEN** a timed session has 41 minutes and 10 seconds left
+- **THEN** the menu bar shows the filled cup followed by "42m"
+- **AND** it shows "41m" once 41 minutes are left
+
+#### Scenario: More than an hour left
+- **WHEN** a timed session has 65 minutes left
+- **THEN** the menu bar shows "1h 5m"
+
+#### Scenario: No session
+- **WHEN** no session is active
+- **THEN** the menu bar shows only the outlined cup
+
 ### Requirement: Status line
-The first item in the menu SHALL be a status line that cannot be selected. It SHALL describe the state at the moment the menu opens. Times SHALL follow the system's time format, and the abbreviated weekday SHALL be added when the end time is not today. The menu SHALL NOT show a countdown.
+The first item in the menu SHALL be a status line that cannot be selected. It SHALL describe the state at the moment the menu opens. Times SHALL follow the system's time format, and the abbreviated weekday SHALL be added when the end time is not today. The status line SHALL show the end time, not a countdown.
 
 #### Scenario: No session
 - **WHEN** no session is active and the user opens the menu
@@ -67,6 +87,29 @@ Under a "Keep Awake For" heading, the menu SHALL offer "Indefinitely", "15 Minut
 #### Scenario: Choosing a preset during a session
 - **WHEN** a session is active and the user chooses "15 Minutes"
 - **THEN** a session ending 15 minutes from now replaces it
+
+### Requirement: Active option is checked
+The option that started the active session SHALL show a checkmark in the menu: the preset the user chose, or "Custom…" for a session started from the Custom duration window. Choosing another option SHALL move the checkmark. Ending the session, by any means, SHALL clear it. Changing "Keep Display On" SHALL NOT change it.
+
+#### Scenario: Choosing an option checks it
+- **WHEN** the user chooses "Indefinitely"
+- **THEN** "Indefinitely" shows a checkmark the next time the menu opens, and no other duration option does
+
+#### Scenario: Choosing another option moves the checkmark
+- **WHEN** "Indefinitely" is checked and the user chooses "1 Hour"
+- **THEN** "1 Hour" is checked and "Indefinitely" is not
+
+#### Scenario: Custom session
+- **WHEN** the user starts a session from the Custom duration window
+- **THEN** "Custom…" is checked
+
+#### Scenario: Session ends
+- **WHEN** the checked session is turned off or reaches its end time
+- **THEN** no duration option is checked
+
+#### Scenario: Mode change keeps the checkmark
+- **WHEN** "1 Hour" is checked and the user changes Keep Display On
+- **THEN** "1 Hour" is still checked
 
 ### Requirement: Keep Display On item
 The menu SHALL show a "Keep Display On" item with a checkmark while the setting is enabled. Choosing the item SHALL toggle the setting.

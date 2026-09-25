@@ -1,0 +1,49 @@
+# XcodeGen spec for Weiki — the source of truth for the Xcode project.
+# Weiki.xcodeproj is generated and git-ignored: run `make generate` before
+# opening it (build, test, and run regenerate it for you).
+name: Weiki
+
+options:
+  deploymentTarget:
+    macOS: "15.0"
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  Weiki:
+    type: application
+    platform: macOS
+    sources:
+      - path: Weiki
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.weiki.app
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        # Menu bar agent: no Dock icon and no app menu.
+        INFOPLIST_KEY_LSUIElement: YES
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"
+    scheme:
+      testTargets:
+        - WeikiTests
+
+  WeikiTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: WeikiTests
+    dependencies:
+      - target: Weiki
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.weiki.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Weiki.app/Contents/MacOS/Weiki"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "-"

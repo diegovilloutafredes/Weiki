@@ -30,7 +30,7 @@ Facts established before writing this design (macOS 27, Xcode 27):
 
 **Non-Goals:**
 - Resuming a session after relaunch.
-- Countdown text anywhere: in the menu bar or inside the menu.
+- A countdown inside the menu. The status line shows the end time; only the menu bar counts down.
 - A test seam for SwiftUI views. The menu and window are verified by running the app and checking `pmset -g assertions`.
 
 ## Decisions
@@ -46,7 +46,7 @@ Weiki calls `IOPMAssertionCreateWithDescription` and `IOPMAssertionRelease` itse
 ### 2. Hold parameters
 - **Type:** `kIOPMAssertPreventUserIdleDisplaySleep` when Keep Display On is enabled; `kIOPMAssertPreventUserIdleSystemSleep` when it is disabled.
 - **Name:** `"Weiki"`.
-- **Details:** mode plus end, for example `"Display kept on, until 14:35"` or `"Display allowed to sleep, indefinitely"`.
+- **Details:** mode plus end, for example `"Display kept on, until 14:35"` or `"Display allowed to sleep, indefinitely"`. The end uses the same wording as the status line, so it names the weekday when it isn't today.
 - **Timeout:** the session's remaining seconds, or `0` for an indefinite session.
 - **Timeout action:** `kIOPMAssertionTimeoutActionRelease`, always passed explicitly, because the default is `TurnOff`.
 - **Human-readable reason and localization bundle path:** `nil` in v1. A reason string requires a localization bundle, and the name and details already identify the hold in `pmset` and Activity Monitor.
@@ -73,37 +73,46 @@ Restarting a session and changing the mode during a session both replace the hol
 ### 5. Session state and who ends a session
 `AwakeController` is `@Observable` and runs on the main actor (the module default). Its state is `.off` or `.on(endDate: Date?)`, where `nil` means indefinite, plus the current hold ID.
 
-- **The absolute `endDate` is the source of truth.** One task loop sleeps for `min(remaining, 60 s)` and then re-reads the wall clock. At or past the end time, it releases the hold and turns off.
-- **The 60-second cap removes a dependency on the timer's clock.** Whether or not the timer counts time the Mac spends asleep, a Mac that wakes after the end time turns off within 60 seconds.
+- **The absolute `endDate` is the source of truth.** One task loop sleeps until the time left, rounded up to whole minutes, drops by one minute (at most 60 s), then re-reads the wall clock. It publishes `minutesLeft` for the menu bar each time it wakes. At or past the end time, it releases the hold and turns off.
+- **The 60-second cap removes a dependency on the timer's clock.** Whether or not the timer counts time the Mac spends asleep, a Mac that wakes after the end time turns off within 60 seconds. The loop's sleep is injected like the clock, so a test checks the cap and that a jump past the end turns the session off.
 - **The system timeout from Decision 2 is only a safety net** for a hung app. It and the loop can both fire at the end time. Release is therefore best-effort and its result is ignored, and the state turns off regardless. The probe showed that releasing an expired hold only returns an error.
 - **Holds are released explicitly, never in `deinit`.** Deinitializers are nonisolated, and quitting releases everything anyway because the process exits.
 - **Alternative:** a timer set to the end time, plus an `NSWorkspace.didWakeNotification` observer that re-checks. It gives the same result with one more moving part.
 - **Alternative:** rely only on the system timeout and poll the system for state. Rejected because it ties the UI to polling the system.
 
+### 5a. Which option started the session
+A `DurationOption` enum (`indefinitely`, `fifteenMinutes`, `oneHour`, `twoHours`, `custom(TimeInterval)`) carries each menu choice's duration. `start(_:)` takes one and, if the hold is acquired, records it as `activeOption`. `stop()` clears it, which covers Turn Off, the timer ending, and a refused hold. A mode change keeps it. The menu checks the item whose option equals `activeOption`, and "Custom…" for any `custom` value.
+
+- **Alternative:** match the session's duration against the presets. Rejected: a custom 15-minute session would check "15 Minutes", and the original duration is gone once the end time is all that's stored.
+
 ### 6. Persistence
 Only one value is persisted: `keepsDisplayOn`, stored in `UserDefaults` under that key and defaulting to `true`. The controller takes a `UserDefaults` instance in its initializer, and tests pass a throwaway suite. Sessions are never persisted, so every launch starts off.
 
 ### 7. Menu bar UI
-A SwiftUI `MenuBarExtra` with `.menuBarExtraStyle(.menu)` and an icon-only label: `Image(systemName: "cup.and.saucer")` when off and `"cup.and.saucer.fill"` when on. The image is a template, so it follows the menu bar's appearance. Showing only the icon avoids the composed-image workaround needed for text in the label.
+A SwiftUI `MenuBarExtra` with `.menuBarExtraStyle(.menu)`. Its label is the cup, outlined (`cup.and.saucer`) when off and filled (`cup.and.saucer.fill`) when on, followed while on by "∞" or the time left ("42m", formatted with `Duration.UnitsFormatStyle`, narrow hours and minutes).
 
-- **The status line is computed when the menu opens.** The `.menu` style is backed by `NSMenu`, which does not re-render while open, so the status line shows the end time rather than a countdown. This is a constraint: no live countdown in the menu.
+- **One composed image.** `MenuBarExtra` labels can't reliably show an image and text side by side, so, as in the author's other menu bar app, the symbol and the text are drawn into one `NSImage`. Unlike that app's colored icon, it's marked as a template, so macOS tints it for light and dark menu bars and the open-menu highlight. Digits are monospaced so the width changes less as minutes pass. The drawing code is `nonisolated`, because AppKit may call an image's drawing handler outside the main actor.
+- **Duration items are `Toggle`s,** which render as native checkmark items. Choosing one, checked or not, starts that option.
+
+- **The menu re-renders only when observed state changes.** The `.menu` style is backed by `NSMenu`. SwiftUI doesn't rebuild it when it opens, and a `TimelineView` inside it never updates; both were verified during implementation with a probe that showed seconds. So the status line shows the end time rather than a countdown. The inputs that change on their own are the day (the weekday rule), the time zone, and the locale's clock. So an `@Observable` `Today` model moves its date forward on `NSCalendarDayChanged`, `NSSystemTimeZoneDidChange`, and `NSLocale.currentLocaleDidChangeNotification`, and the menu and label read it instead of `.now`.
 - **Menu contents:** a disabled `Text` for the status line, `Button`s, a `Section("Keep Awake For")`, a `Toggle` (which renders as a checkmark item), and `Divider`s.
 - **Alternatives rejected during brainstorming:**
   - The `.window` popover style used by the author's other menu bar app: it stays open until clicked away and needs more layout code.
   - An AppKit `NSStatusItem` with left-click to toggle: `MenuBarExtra` can't act on a click, so this would mean dropping `MenuBarExtra`.
 
 ### 8. Custom duration window
-A SwiftUI `Window("Custom Duration", id: "custom-duration")` scene with `.windowResizability(.contentSize)` and `.defaultLaunchBehavior(.suppressed)`, so it never opens at launch.
+A SwiftUI `Window("Custom Duration", id: "custom-duration")` scene with `.windowResizability(.contentSize)`, `.defaultLaunchBehavior(.suppressed)`, and `.restorationBehavior(.disabled)`. It never opens at launch, and it isn't restored on relaunch if Weiki quit while it was open.
 
-- "Custom…" calls `openWindow(id:)` and then `NSApp.activate()`. That is the macOS 14+ API; `activate(ignoringOtherApps:)` is deprecated.
+- "Custom…" calls `dismissWindow(id:)`, `openWindow(id:)`, and then `NSApp.activate()`. Dismissing first means a copy left open behind other apps also reopens at 0 hours 30 minutes. `activate()` is the macOS 14+ API; `activate(ignoringOtherApps:)` is deprecated.
 - Start calls the controller and then `dismissWindow(id:)`.
-- `.defaultLaunchBehavior` requires macOS 15, which sets the deployment target to macOS 15.0.
+- The content view calls `.fixedSize()` so the window hugs its content. It resets the pickers to 0 hours 30 minutes in `.onAppear`, because a `Window` scene keeps its state across close and reopen.
+- `.defaultLaunchBehavior` and `.restorationBehavior` require macOS 15, which sets the deployment target to macOS 15.0.
 - **Alternatives:** an `NSAlert` with an accessory view, which works on macOS 14 but is an AppKit modal; or a submenu with more presets, which doesn't allow a custom duration.
 
 ### 9. Status line text
 A pure function takes the state, `now`, a calendar, and a locale, and returns the status string. It is unit-tested with fixed inputs. It uses `Date.FormatStyle`, so the time follows the system format, and it adds the abbreviated weekday when the end time is not on the same calendar day as `now`.
 
-The user-visible strings are ready for translation, so adding Spanish later only means adding a String Catalog. The status strings use `String(localized:)`, for example `String(localized: "Awake until \(time)")`, and every other label is a SwiftUI string literal, which is already a localization key. The hold's details text (Decision 2) is meant for `pmset` and stays in English.
+The user-visible strings are ready for translation, so adding Spanish later only means adding a String Catalog. The status strings use `String(localized:)`, for example `String(localized: "Awake until \(time)")`, and every other label is a SwiftUI string literal, which is already a localization key. The hold's details text (Decision 2) is meant for `pmset`: its wording stays in English, while its end time follows the locale's format, like the status line.
 
 ### 10. Project setup
 - **XcodeGen:** `project.yml` is the source of truth, and the generated `Weiki.xcodeproj` is git-ignored. There are two targets: the `Weiki` application and `WeikiTests`, a unit-test bundle hosted by the app.
@@ -130,7 +139,7 @@ The user-visible strings are ready for translation, so adding Spanish later only
 
 ## Risks / Trade-offs
 
-- **The Custom window opens behind other apps,** because activation is cooperative for an app with no Dock icon. → Call `NSApp.activate()` after `openWindow`. If that proves insufficient, call `orderFrontRegardless()` on the window (see Open Questions).
+- **Weiki may not become the active app when the Custom window opens,** because activation is cooperative. → The window still opens in front of other apps' windows; at worst the first click only focuses it (see Open Questions).
 - **The app timer and the system timeout race at the end time.** → Release is best-effort and its result is ignored; the state turns off regardless.
 - **A session can end up to 60 seconds late after waking past its end time.** → Acceptable. The system timeout may already have released the hold, and the spec states "within one minute of waking".
 - **The status line goes stale while the menu stays open.** → It shows the end time, which stays correct, rather than a countdown.
@@ -144,4 +153,7 @@ This is a new app, so there is nothing to migrate. `make run` installs it by cop
 
 ## Open Questions
 
-- Does `NSApp.activate()` alone reliably bring the Custom window to the front when it is opened from the menu, or is `orderFrontRegardless()` also needed? This will be answered while implementing the window (task group 6). The answer does not change the specs, the approach, or the task breakdown.
+- **Answered:** does `NSApp.activate()` alone bring the Custom window to the front, or is `orderFrontRegardless()` also needed?
+  - The window opens in front of other apps' windows. With real mouse events, the window server's z-order lists it first. So `orderFrontRegardless()` isn't needed.
+  - `NSApp.activate()` was refused under cooperative activation in every automated attempt: the previously active app stayed frontmost, so the window didn't become key. Asking again from `.onAppear`, once the menu had closed, made no difference.
+  - Still to check by hand: whether a human click makes Weiki active. If it doesn't, the first click on the window only focuses it. That is a usability papercut, not a spec violation; a non-activating panel would be the fix.

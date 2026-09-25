@@ -10,13 +10,14 @@ Keeping the Mac awake today means running `caffeinate` in a terminal and remembe
 - Keep-awake sessions: indefinitely or for 15 minutes, 1 hour, 2 hours, or a custom duration. A session ends when the user turns it off, when its time runs out, or when Weiki quits.
 - Two modes, chosen with a "Keep Display On" setting that is on by default and remembered: keep the display and the system awake (like `caffeinate -d`), or keep only the system awake and let the display turn off (like `caffeinate -i`).
 - Menu bar interface: a cup icon (outlined when off, filled when on) whose pull-down menu shows the current state (for example "Awake until 14:35") and holds every control. A small window lets the user enter a custom duration.
+- While a session is active, the menu bar shows what's left next to the cup: ∞ for an indefinite session, or the time left counting down by the minute (for example "42m"). In the menu, the option that started the session has a checkmark.
 - Weiki holds the Mac awake the same way `caffeinate` does, directly, without launching `caffeinate`. The hold appears as "Weiki" in `pmset -g assertions` and in Activity Monitor.
 - Project scaffolding: XcodeGen project, Makefile, and automated tests.
 
 Explicitly not in this change:
 - Keeping the Mac awake with the lid closed, and preventing sleep from the Apple menu or a low battery. macOS does not let an app's sleep hold override these; closed-lid operation would need `sudo pmset disablesleep` and a privileged helper.
 - Later layers: until an app quits, only while on AC power, launch at login, a notification when a timer ends, and a list of other processes preventing sleep.
-- A countdown in the menu bar, localization, a custom app icon, and the signing, notarization, release, and auto-update pipeline.
+- Localization, a custom app icon, and the signing, notarization, release, and auto-update pipeline.
 
 ## Capabilities
 
