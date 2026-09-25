@@ -7,7 +7,7 @@ ARCH     := $(shell uname -m)
 # CI override: make build SIGNING_FLAGS="CODE_SIGNING_ALLOWED=NO"
 SIGNING_FLAGS ?= CODE_SIGN_IDENTITY="-"
 
-.PHONY: generate build run test clean
+.PHONY: generate build run test clean icon
 
 # ── Generate Xcode project (XcodeGen) ─────────────────────────────────────────
 # project.yml is the source of truth; Weiki.xcodeproj is generated and
@@ -55,6 +55,13 @@ run: build
 	@rm -rf /Applications/$(APP)
 	@cp -R $(BUILD_DIR)/$(APP) /Applications/$(APP)
 	@open /Applications/$(APP)
+
+# ── App icon ─────────────────────────────────────────────────────────────────
+# Redraws every size in Weiki/Assets.xcassets/AppIcon.appiconset. `xcrun` picks
+# Xcode's toolchain; a swiftly `swift` on PATH fails against the Xcode SDK.
+
+icon:
+	@xcrun swift scripts/generate-appicon.swift
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 
