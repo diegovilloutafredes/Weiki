@@ -105,8 +105,18 @@ A SwiftUI `Window("Custom Duration", id: "custom-duration")` scene with `.window
 
 - "Custom…" calls `dismissWindow(id:)`, `openWindow(id:)`, and then `NSApp.activate()`. Dismissing first means a copy left open behind other apps also reopens at 0 hours 30 minutes. `activate()` is the macOS 14+ API; `activate(ignoringOtherApps:)` is deprecated.
 - Start calls the controller and then `dismissWindow(id:)`.
-- The content view calls `.fixedSize()` so the window hugs its content. It resets the pickers to 0 hours 30 minutes in `.onAppear`, because a `Window` scene keeps its state across close and reopen.
+- The content view calls `.fixedSize()` so the window hugs its content. It resets the text to "30m" in `.onAppear`, because a `Window` scene keeps its state across close and reopen.
+- **One text field, not pickers.**
+  - A pure `parseDuration` function, tested with a table, turns the text into seconds. It accepts `90`, `45m`, `2h`, `1h30`, `1h 30m`, and `1:30`, from 1 minute to 24 hours, and anything else is invalid.
+  - The line below the field shows the end time with `endTimeDescription`, inside a `TimelineView(.everyMinute)`. A regular window re-renders a `TimelineView`, unlike the menu.
+  - Return triggers Start through `.keyboardShortcut(.defaultAction)`, and Escape closes the window through `.onExitCommand`.
+  - **Alternative:** two pickers (hours 0–24, minutes 0–59). Replaced because they took at least four clicks and offered no typing.
+  - **Alternative:** two number fields with steppers. Not chosen: two controls instead of one.
 - `.defaultLaunchBehavior` and `.restorationBehavior` require macOS 15, which sets the deployment target to macOS 15.0.
+- **Placement under the icon.** `.defaultWindowPlacement` (macOS 15) computes the window's position when it first opens after launch. Within a launch, SwiftUI reopens the window at its last frame, including wherever the user dragged it. That is standard macOS behavior and is kept on purpose (it was chosen over re-placing the window on every opening). `.restorationBehavior(.disabled)` makes each launch start fresh. The window's top sits just below the menu bar, and it is centered on the pointer's x, which is under the Weiki icon because the menu drops down from it. It is clamped to stay on screen. If the pointer isn't within the menu's reach of the menu bar (the keyboard case), the window goes to the top-right instead. The math is a pure function tested with fixed inputs; the scene reads `NSEvent.mouseLocation` and the display's visible rect and passes them in.
+  - **Coordinates,** established with a probe on macOS 27. `WindowPlacementContext.defaultDisplay.visibleRect` and `WindowPlacement`'s point both use a top-left origin with y growing downward: the visible rect was `(0, 30, 1680, 1020)` below a 30 pt menu bar. The point is the window frame's top-left corner, title bar included. `NSEvent.mouseLocation` uses AppKit's bottom-left origin, so the pointer's y is flipped against the primary screen's height before the comparison.
+  - **Alternative:** read the icon's exact frame from the menu bar's window. Rejected because it depends on a private AppKit class (`NSStatusBarWindow`).
+  - **Alternative:** `.defaultPosition(.topTrailing)`. Rejected because the window lands at the far right, not under the icon, whenever other menu bar items sit to Weiki's right.
 - **Alternatives:** an `NSAlert` with an accessory view, which works on macOS 14 but is an AppKit modal; or a submenu with more presets, which doesn't allow a custom duration.
 
 ### 9. Status line text

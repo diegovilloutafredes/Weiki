@@ -55,7 +55,7 @@
 
 ## 6. Custom duration window
 
-- [x] 6.1 Add the `Window` scene and the "Custom…" item per design Decision 8. The window has hours from 0 to 24 and minutes from 0 to 55 in 5-minute steps, and opens at 0 hours 30 minutes. Start is disabled at 0:00; otherwise it starts the session and closes the window. Verify:
+- [x] 6.1 Add the `Window` scene and the "Custom…" item per design Decision 8. The window has hours from 0 to 24 and minutes from 0 to 55 in 5-minute steps (superseded by 9.1: 1-minute steps, 0 to 59), and opens at 0 hours 30 minutes. Start is disabled at 0:00; otherwise it starts the session and closes the window. Verify:
   - No window appears at launch.
   - "Custom…" brings the window in front of other apps. If it doesn't, add `orderFrontRegardless()` and record the answer under Open Questions in `design.md`.
   - 1 hour 30 minutes shows a timeout of about 5400 seconds in `pmset -g assertions`.
@@ -70,7 +70,7 @@
 
   Record any deviation and fix it.
 - [x] 7.2 Review the Swift sources and fix the confirmed findings. Verify that `make test` still passes and that `openspec validate add-keep-awake-menu --strict` succeeds.
-- [ ] 7.3 By hand (needs a person): start a 5-minute custom session, close the lid for more than 5 minutes, then open it. Verify that within a minute of waking the icon is outlined, the status line reads "Weiki is off", and `pmset -g assertions` lists no Weiki hold.
+- [ ] 7.3 By hand (needs a person): start a 1-minute custom session, put the Mac to sleep (Apple menu > Sleep, or close the lid with no external display) for more than 1 minute, then wake it. Also in the Custom window: type a duration and press Return to start it; reopen it and press Escape to close it without changes. Verify that within a minute of waking the icon is outlined, the status line reads "Weiki is off", and `pmset -g assertions` lists no Weiki hold.
 
 ## 8. Active option and time left in the menu bar
 
@@ -89,3 +89,39 @@
   - VoiceOver still reads "Weiki, Awake until …"
 - [x] 8.4 Update the project notes for `DurationOption`, `activeOption`, `minutesLeft`, and the composed template label. Verify that the text matches the code.
 - [x] 8.5 Rerun the scenario walkthrough, extended with the ✓ and menu bar text checks, and run `openspec validate add-keep-awake-menu --strict`. Verify that both pass.
+
+## 9. One-minute steps in the Custom window
+
+- [x] 9.1 Change the Custom window's minutes picker to 0 to 59 in 1-minute steps. (Superseded by 11.3: the window now has one text field that accepts any minute count.) Verify in the app through System Events:
+  - the minutes pop-up lists 0 to 59 and the window still opens at 0 hours 30 minutes
+  - 0 hours 1 minute starts a session with a timeout of about 60 seconds, and the menu bar shows "1m"
+  - about a minute later the session ends by itself: outlined cup, "Weiki is off", no Weiki hold
+- [x] 9.2 Update the project notes for the new range. Verify that `make test` passes and `openspec validate add-keep-awake-menu --strict` succeeds.
+
+## 10. Custom window under the Weiki icon
+
+- [x] 10.1 Probe (throwaway) which coordinate system `WindowPlacement` and the display's `visibleRect` use, compared with `NSEvent.mouseLocation`, and record the answer in design Decision 8. Verify by the placed window's frame as reported through Accessibility.
+- [x] 10.2 Write tests first for the placement function: centered on a pointer under the menu bar; clamped at the left and right edges; top just below the menu bar; top-right when the pointer is far from the menu bar or missing. Verify that they fail before 10.3.
+- [x] 10.3 Implement the function and wire it with `.defaultWindowPlacement`. Verify that `make test` passes with no warnings, and in the app:
+  - with a real click on "Custom…", the window's top is at the menu bar's bottom and it overlaps the Weiki icon horizontally
+  - when opened with the pointer elsewhere, it appears at the top-right below the menu bar
+  - within the same launch it reopens where it was last, including after being moved (standard macOS behavior, chosen over re-placing it on every opening)
+- [x] 10.4 Update the project notes. Verify that `openspec validate add-keep-awake-menu --strict` succeeds.
+
+## 11. Typed custom duration
+
+- [x] 11.1 Write tests first, with a fixed calendar and locale:
+  - `parseDuration` valid inputs: "45", "45m", "45 min", "90", "2h", "1h30", "1h 30m", "1:30", "0:45", "24h", " 5m "
+  - `parseDuration` invalid inputs: "", "abc", "0", "0m", "25h", "24h1m", "1h60", "1:60", "1:5", "-5", "1.5h"
+  - the line below the field: "1h30" at 14:00 shows "Until 15:30"; "24h" on a Thursday at 10:00 shows "Until Fri 10:00"; "abc" shows the hint
+
+  Verify that they fail before 11.2.
+- [x] 11.2 Implement `parseDuration` and the line below the field. Verify that `make test` passes with no warnings.
+- [x] 11.3 Replace the pickers with the text field, the line below it, Start (the default button, disabled while the text is invalid), and Escape. The field opens with "30m" and has focus. Verify in the app through System Events:
+  - the field opens with "30m", and the line shows the end time 30 minutes from now
+  - entering "1h30" updates the line, and Start starts a session of about 5400 seconds
+  - "abc" shows the hint and disables Start
+  - "1" starts a session, and the menu bar shows "1m"
+
+  Check Return and Escape by hand, because scripted keystrokes go to the frontmost app, not to Weiki.
+- [x] 11.4 Update the project notes and rerun the scenario walkthrough with typed durations. Verify that `openspec validate add-keep-awake-menu --strict` succeeds.

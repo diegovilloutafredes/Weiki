@@ -120,23 +120,46 @@ The menu SHALL show a "Keep Display On" item with a checkmark while the setting 
 - **AND** the item shows no checkmark the next time the menu opens
 
 ### Requirement: Custom duration window
-Choosing "Custom…" SHALL open a small window in front of other windows. In it, the user sets hours (0 to 24) and minutes (0 to 55, in 5-minute steps), starting at 0 hours and 30 minutes, and starts the session with a Start button.
+Choosing "Custom…" SHALL open a small window in front of other windows, just below the menu bar. The first time it opens after Weiki launches, it SHALL be centered horizontally on the point where "Custom…" was chosen, which is under the Weiki icon, and kept fully on screen. When the pointer isn't near the menu bar (the menu was used from the keyboard), it SHALL appear at the top-right of the screen instead. After that, it SHALL reopen where it was last, including wherever the user moved it.
+
+In the window, the user types a duration into one text field, which SHALL open containing "30m". The field SHALL accept minutes as a bare number ("90") or with "m" ("45m"), hours with "h" ("2h"), hours and minutes ("1h30", "1h 30m"), and "h:mm" ("1:30"), from 1 minute up to 24 hours. Below the field, the window SHALL show when a session would end ("Until 15:42", with the weekday when it isn't today), or a hint when the text isn't a valid duration. Start, or the Return key, SHALL start a session of that duration and close the window. Start SHALL be disabled while the text isn't a valid duration. The Escape key SHALL close the window without changes.
 
 #### Scenario: Opening the window
-- **WHEN** the user chooses "Custom…"
-- **THEN** the Custom duration window appears in front of other apps' windows, set to 0 hours and 30 minutes
+- **WHEN** the user clicks "Custom…" for the first time since Weiki launched
+- **THEN** the Custom duration window appears in front of other apps' windows, just below the menu bar and under the Weiki icon, with "30m" entered
 
-#### Scenario: Zero duration
-- **WHEN** hours and minutes are both 0
-- **THEN** the Start button is disabled
+#### Scenario: Icon near the edge of the screen
+- **WHEN** the Weiki icon is close to the right edge of the screen and the user clicks "Custom…" for the first time since Weiki launched
+- **THEN** the window appears just below the menu bar, entirely on screen
 
-#### Scenario: Starting a custom session
-- **WHEN** the user sets 1 hour and 30 minutes and clicks Start at 14:00
+#### Scenario: Chosen from the keyboard
+- **WHEN** the user chooses "Custom…" from the keyboard for the first time since Weiki launched, with the pointer away from the menu bar
+- **THEN** the window appears at the top-right of the screen, just below the menu bar
+
+#### Scenario: Reopening where it was
+- **WHEN** the user moves the window, closes it, and chooses "Custom…" again
+- **THEN** the window reopens where the user left it
+
+#### Scenario: Typing a duration
+- **WHEN** the user types "1h30" at 14:00
+- **THEN** the window shows "Until 15:30" and Start is enabled
+
+#### Scenario: A bare number is minutes
+- **WHEN** the user types "90" and clicks Start at 14:00
 - **THEN** a session ending at 15:30 is active, replacing any active session
 - **AND** the window closes
 
+#### Scenario: One-minute session
+- **WHEN** the user types "1" and clicks Start at 14:00
+- **THEN** a session ending at 14:01 is active, and the menu bar shows "1m"
+
+#### Scenario: Text that isn't a duration
+- **WHEN** the user types "abc", "0", or "25h"
+- **THEN** the window shows a hint instead of an end time
+- **AND** Start is disabled
+
 #### Scenario: Closing without starting
-- **WHEN** the user closes the window without clicking Start
+- **WHEN** the user closes the window, or presses Escape, without starting a session
 - **THEN** the session state is unchanged
 
 ### Requirement: Quit item
