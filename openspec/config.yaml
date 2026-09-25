@@ -1,0 +1,49 @@
+schema: spec-driven
+
+# Project context: the facts and conventions every OpenSpec artifact follows.
+context: |
+  Weiki is a macOS menu bar app (no Dock icon) that keeps the Mac awake. It
+  creates IOKit power assertions directly (the mechanism behind
+  /usr/bin/caffeinate); it never spawns caffeinate. Personal project, built and
+  installed locally, not sandboxed, no third-party dependencies.
+
+  Stack: Swift 6 language mode with default MainActor isolation; SwiftUI
+  (MenuBarExtra in .menu style plus one small Window scene); XcodeGen
+  (project.yml is the source of truth, the .xcodeproj is generated and not
+  committed); Makefile targets generate/build/run/test/clean; Swift Testing.
+  Minimum macOS 15.0.
+
+  Roadmap, one OpenSpec change per layer: (1) toggle, durations, display mode;
+  (2) until-app-quits, AC-power-only, launch at login, end-of-timer
+  notification; (3) list of other processes holding sleep assertions.
+
+  Conventions:
+  - Grow in layers: ship the smallest working version, then build on top of it.
+  - Specs describe observable behavior; type names and APIs belong in design.md.
+  - Tests land with the work that needs them (test first); tests that create
+    real power assertions run serialized.
+  - Verify keep-awake behavior against `pmset -g assertions`.
+  - Standalone Swift scripts use `xcrun swiftc` (the swiftly `swiftc` on PATH
+    fails against the Xcode SDK).
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
