@@ -5,6 +5,7 @@ import SwiftUI
 struct MenuContent: View {
     @Bindable var controller: AwakeController
     let today: Today
+    let loginItem: LoginItem
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
@@ -25,6 +26,10 @@ struct MenuContent: View {
             ))
         }
         Toggle("Keep Display On", isOn: $controller.keepsDisplayOn)
+        Toggle("Launch at Login", isOn: Binding(
+            get: { loginItem.isEnabled },
+            set: { loginItem.setEnabled($0) }
+        ))
         Divider()
         Button("Quit Weiki") { NSApplication.shared.terminate(nil) }
     }

@@ -10,6 +10,7 @@ Weiki is a small macOS menu bar app that does what `caffeinate` does, from a men
 - **Display on, or just the system.** "Keep Display On" decides whether the screen stays on too, or only the Mac stays awake while the screen sleeps.
 - **Custom durations.** Type `45`, `45m`, `2h`, `1h30`, or `1:30`, and Weiki shows when the session would end before you start it.
 - **Nothing left behind.** A session ends on time, even if the Mac slept past the end, and quitting Weiki releases its hold right away.
+- **Launch at Login.** Off until you turn it on in the menu; the checkmark always matches System Settings.
 
 ## How it works
 
