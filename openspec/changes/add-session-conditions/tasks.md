@@ -69,5 +69,14 @@
 
 ## 6. Integration
 
-- [ ] 6.1 Run `make clean generate test run`. Then walk through every scenario in the four spec deltas against the running app and `pmset -g assertions`. The scenarios that need a battery or a person were covered by 4.3 and 5.3. Record any deviation and fix it. Verify that `openspec validate add-session-conditions --strict` succeeds.
+- [x] 6.1 Run `make clean generate test run`. Then walk through every scenario in the four spec deltas against the running app and `pmset -g assertions`. The scenarios that need a battery or a person were covered by 4.3 and 5.3. Record any deviation and fix it. Verify that `openspec validate add-session-conditions --strict` succeeds.
+
+  Walked through with System Events, `pmset`, and menu bar screenshots on the installed build:
+  - the submenu (Dock apps only, sorted, following TextEdit launching and quitting)
+  - an app session replacing a timed one, and ending on quit and on `kill -9`
+  - "∞", "15m", and "TextEdit" next to the cup
+  - Only on AC Power on AC power, and its checkmark kept across a relaunch
+  - the Custom window
+
+  The battery and permission scenarios are the manual tasks 4.3, 5.2, and 5.3.
 - [ ] 6.2 Review the Swift sources and fix the confirmed findings. Verify that `make test` and `make build` pass with no warnings.
