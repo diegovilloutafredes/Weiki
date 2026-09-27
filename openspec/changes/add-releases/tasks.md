@@ -25,8 +25,8 @@
 
 ## 5. First release
 
-- [ ] 5.1 Push `main`. Verify that the Build workflow passes on the runner, including the tests that create real power assertions.
-- [ ] 5.2 Cut the first release with `make tag`. Verify that the Release workflow passes and that the release has `Weiki.dmg` and `Weiki.zip`. Also verify that the zip served at `releases/latest/download/Weiki.zip` holds a universal, validly signed app with the tagged version.
+- [x] 5.1 Push `main`. Verify that the Build workflow passes on the runner, including the tests that create real power assertions.
+- [x] 5.2 Cut the first release with `make tag`. Verify that the Release workflow passes and that the release has `Weiki.dmg` and `Weiki.zip`. Also verify that the zip served at `releases/latest/download/Weiki.zip` holds a universal, validly signed app with the tagged version.
 - [ ] 5.3 By hand (needs a person), on a Mac where Weiki is running with Launch at Login on:
   - Run the one-liner. Check that Weiki quits, is replaced, and relaunches with no session active, and that the Launch at Login ✓ is still there.
   - Download `Weiki.zip` in a browser and run `install.command`. Check that the app opens.
