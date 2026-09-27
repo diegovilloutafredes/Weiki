@@ -2,13 +2,16 @@
 
 Keep your Mac awake from the menu bar.
 
-Weiki is a small macOS menu bar app that does what `caffeinate` does, from a menu instead of a terminal. It keeps the Mac awake indefinitely, for 15 minutes, 1 hour, or 2 hours, or for any duration you type.
+Weiki is a small macOS menu bar app that does what `caffeinate` does, from a menu instead of a terminal. It keeps the Mac awake indefinitely, for 15 minutes, 1 hour, or 2 hours, for any duration you type, or until an app quits.
 
 ## Features
 
-- **Always visible.** The cup in the menu bar fills while Weiki keeps the Mac awake, next to ∞ or the time left (for example `42m`).
+- **Always visible.** The cup in the menu bar fills while Weiki keeps the Mac awake, next to ∞, the time left (for example `42m`), or the app it's waiting for.
 - **Display on, or just the system.** "Keep Display On" decides whether the screen stays on too, or only the Mac stays awake while the screen sleeps.
 - **Custom durations.** Type `45`, `45m`, `2h`, `1h30`, or `1:30`, and Weiki shows when the session would end before you start it.
+- **Until an app quits.** Pick a running app, and the Mac stays awake until that app quits, even if it crashes. Useful for a long build, render, or download.
+- **Only on AC power.** Turn it on and a session pauses while the Mac runs on battery, then picks up again when you plug it back in.
+- **Notify when time's up.** Turn it on and Weiki posts a notification when a timed session runs out.
 - **Nothing left behind.** A session ends on time, even if the Mac slept past the end, and quitting Weiki releases its hold right away.
 - **Launch at Login.** Off until you turn it on in the menu; the checkmark always matches System Settings.
 

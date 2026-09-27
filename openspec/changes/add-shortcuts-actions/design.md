@@ -72,4 +72,4 @@ Each gets a short title and an SF Symbol: `cup.and.saucer.fill`, `cup.and.saucer
 
 - Searching installed apps (not just running ones) for the app parameter.
 - A "Set Keep Display On" action, if automations turn out to need one.
-- Whether Apple's App Intents Testing framework, which tests intents, parameter resolution, and entity queries without the Shortcuts app, can replace some of task 2.2's manual checks. Evaluate it during task 1.2.
+- *Answered:* Apple's App Intents Testing framework can't replace task 2.2's manual checks yet. It needs macOS 27 and Xcode 27, and it runs from a UI-test target that launches the app (`XCUIApplication` plus `IntentDefinitions(bundleIdentifier:)`). CI builds with Xcode 26.5, so the logic stays in `ShortcutActions`, with plain unit tests.
