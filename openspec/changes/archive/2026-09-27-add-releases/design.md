@@ -68,7 +68,7 @@ Only the release job gets `contents: write`, which it needs to create the releas
 
 ## Risks / Trade-offs
 
-- **Launch at Login after an update.** Every build has a new ad-hoc signature, so macOS might not carry the login item over when the app is replaced. → A manual task installs a second build over the first and checks that the ✓ survives. If it doesn't, the README tells people to turn the item on again after updating.
+- **Launch at Login after an update.** Every build has a new ad-hoc signature, so macOS might not carry the login item over when the app is replaced. → A manual task installs a second build over the first and checks that the ✓ survives. If it doesn't, the README tells people to turn the item on again after updating. *Checked: the ✓ stayed on through two replacements, so no README note is needed.*
 - **Weiki has only been built with Xcode 27.** → The first Build run shows whether Xcode 26.5 builds it. If not, both workflows move to the `xcode-27` image and the README's requirement changes to match. *Checked: the first Build and Release runs built Weiki with Xcode 26.5.*
 - **Real power assertions on CI.** `SystemPowerAssertionsTests` create IOKit assertions on the runner and read them back. → The first Build run shows whether hosted runners allow that. If they don't, the tests are not skipped quietly; the fix is a deliberate decision. *Checked: all 56 tests passed on the runner, including the timed hold that IOKit releases on its own.*
 - **Gatekeeper blocks browser downloads.** Ad-hoc signed copies downloaded in a browser are quarantined. → The one-liner avoids the flag, `install.command` clears it, and the README explains "Open Anyway".
