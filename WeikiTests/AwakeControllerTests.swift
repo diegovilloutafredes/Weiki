@@ -14,6 +14,7 @@ final class TestClock {
     private let service = RecordingPowerAssertions()
     private let clock = TestClock()
     private let appWatcher = FakeAppQuitWatcher()
+    private let power = FakePowerSource()
     private let xcode = WatchedApp(processIdentifier: 501, name: "Xcode")
     private let keynote = WatchedApp(processIdentifier: 502, name: "Keynote")
 
@@ -26,7 +27,13 @@ final class TestClock {
     }
 
     private func makeController() -> AwakeController {
-        AwakeController(service: service, defaults: defaults, now: { [clock] in clock.now }, appWatcher: appWatcher)
+        AwakeController(
+            service: service,
+            defaults: defaults,
+            now: { [clock] in clock.now },
+            appWatcher: appWatcher,
+            powerSource: power
+        )
     }
 
     // MARK: - Starting and stopping
@@ -448,6 +455,155 @@ final class TestClock {
         #expect(controller.state == .on(until: .appQuits(xcode), paused: false))
         #expect(service.details.last == "Display allowed to sleep, until Xcode quits")
         #expect(appWatcher.watched == xcode)
+    }
+
+    // MARK: - Only on AC Power
+
+    @Test func onlyOnACPowerDefaultsToOffAndPersists() {
+        let first = makeController()
+        #expect(first.onlyOnACPower == false)
+
+        first.onlyOnACPower = true
+
+        #expect(makeController().onlyOnACPower)
+    }
+
+    @Test func unpluggingPausesTheSessionAndKeepsItsEnd() {
+        let controller = makeController()
+        controller.onlyOnACPower = true
+        let end = clock.now.addingTimeInterval(3600)
+        controller.start(.custom(3600))
+
+        power.isOnACPower = false
+
+        #expect(controller.state == .on(until: .date(end), paused: true))
+        #expect(controller.state.isHolding == false)
+        #expect(service.calls == [.acquire(keepsDisplayOn: true, timeout: 3600), .release(1)])
+        #expect(controller.activeOption == .custom(3600))
+        #expect(controller.minutesLeft == 60)
+    }
+
+    @Test func startingOnBatteryStartsPaused() {
+        let controller = makeController()
+        controller.onlyOnACPower = true
+        power.isOnACPower = false
+
+        controller.start(.oneHour)
+
+        #expect(controller.state == .on(until: .date(clock.now.addingTimeInterval(3600)), paused: true))
+        #expect(controller.activeOption == .oneHour)
+        #expect(service.calls.isEmpty)
+    }
+
+    @Test func turningTheSettingOnWhileOnBatteryPauses() {
+        let controller = makeController()
+        power.isOnACPower = false
+        controller.start(.indefinitely)
+
+        controller.onlyOnACPower = true
+
+        #expect(controller.state == .on(until: .never, paused: true))
+        #expect(service.heldIDs.isEmpty)
+    }
+
+    @Test func turningTheSettingOffWhilePausedResumes() {
+        let controller = makeController()
+        controller.onlyOnACPower = true
+        power.isOnACPower = false
+        controller.start(.indefinitely)
+
+        controller.onlyOnACPower = false
+
+        #expect(controller.state == .on(until: .never, paused: false))
+        #expect(controller.state.isHolding)
+        #expect(service.heldIDs == [1])
+    }
+
+    @Test func pluggingInResumesWithTheRemainingTime() {
+        let controller = makeController()
+        controller.onlyOnACPower = true
+        let end = clock.now.addingTimeInterval(3600)
+        controller.start(.custom(3600))
+        power.isOnACPower = false
+        clock.now += 1800
+
+        power.isOnACPower = true
+
+        #expect(controller.state == .on(until: .date(end), paused: false))
+        #expect(service.calls == [
+            .acquire(keepsDisplayOn: true, timeout: 3600),
+            .release(1),
+            .acquire(keepsDisplayOn: true, timeout: 1800),
+        ])
+        #expect(service.heldIDs == [2])
+        #expect(controller.minutesLeft == 30)
+    }
+
+    @Test func modeChangeWhilePausedHoldsNothingAndResumesInTheNewMode() {
+        let controller = makeController()
+        controller.onlyOnACPower = true
+        power.isOnACPower = false
+        controller.start(.indefinitely)
+
+        controller.keepsDisplayOn = false
+
+        #expect(service.calls.isEmpty)
+        power.isOnACPower = true
+        #expect(service.calls == [.acquire(keepsDisplayOn: false, timeout: 0)])
+    }
+
+    @Test func refusedHoldOnResumeTurnsOff() {
+        let controller = makeController()
+        controller.onlyOnACPower = true
+        power.isOnACPower = false
+        controller.start(.indefinitely)
+        service.refusesHolds = true
+
+        power.isOnACPower = true
+
+        #expect(controller.state == .off)
+        #expect(controller.activeOption == nil)
+        #expect(service.heldIDs.isEmpty)
+    }
+
+    /// Reports that don't change whether the session must pause leave its hold alone.
+    @Test func reportsThatDontChangeThePauseLeaveTheHoldAlone() {
+        let controller = makeController()
+        controller.start(.indefinitely)
+
+        power.isOnACPower = false // The setting is off, so the session keeps holding.
+        power.isOnACPower = true
+        controller.onlyOnACPower = true // On AC power there's nothing to pause.
+        power.isOnACPower = true // Still on AC power, as reported on wake.
+
+        #expect(service.calls == [.acquire(keepsDisplayOn: true, timeout: 0)])
+        #expect(controller.state == .on(until: .never, paused: false))
+    }
+
+    @Test func aSessionUntilAnAppQuitsPausesAndStillEndsWhenTheAppQuits() {
+        let controller = makeController()
+        controller.onlyOnACPower = true
+        power.isOnACPower = false
+        controller.start(.untilQuit(xcode))
+        #expect(controller.state == .on(until: .appQuits(xcode), paused: true))
+        #expect(appWatcher.watched == xcode)
+
+        appWatcher.quitWatchedApp()
+
+        #expect(controller.state == .off)
+    }
+
+    @Test func aPausedTimedSessionStillEndsOnTime() async throws {
+        let controller = AwakeController(service: service, defaults: defaults, appWatcher: appWatcher, powerSource: power)
+        controller.onlyOnACPower = true
+        power.isOnACPower = false
+
+        controller.start(.custom(0.2))
+        try #require(controller.state != .off && !controller.state.isHolding)
+
+        let ended = await waitUntil { controller.state == .off }
+        #expect(ended)
+        #expect(service.calls.isEmpty)
     }
 }
 

@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// Keep-awake sessions: the current hold, what ends it (a date, or an app quitting), and the
-/// display-mode setting.
+/// "Keep Display On" and "Only on AC Power" settings.
 ///
 /// The end date is the source of truth for when a timed session ends. The timeout each hold
 /// carries on the system side is only a safety net in case Weiki stops responding.
@@ -12,6 +12,11 @@ final class AwakeController {
         case off
         /// `paused` while "Only on AC Power" keeps the session from holding on battery.
         case on(until: SessionEnd, paused: Bool)
+
+        /// Whether a session holds the Mac awake: on, and not paused.
+        var isHolding: Bool {
+            if case .on(_, paused: false) = self { true } else { false }
+        }
     }
 
     private(set) var state: State = .off
@@ -29,29 +34,45 @@ final class AwakeController {
         }
     }
 
+    /// Whether sessions hold the Mac awake only while it's on AC power, and pause on battery.
+    /// Remembered across launches.
+    var onlyOnACPower: Bool {
+        didSet {
+            guard onlyOnACPower != oldValue else { return }
+            defaults.set(onlyOnACPower, forKey: Self.onlyOnACPowerKey)
+            pauseOrResume()
+        }
+    }
+
     private let service: any PowerAssertionService
     private let defaults: UserDefaults
     private let now: () -> Date
     private let sleep: (Duration) async throws -> Void
     private let appWatcher: any AppQuitWatcher
+    private let powerSource: any PowerSourceService
     @ObservationIgnored private var holdID: UInt32?
     @ObservationIgnored private var endTask: Task<Void, Never>?
 
     private static let keepsDisplayOnKey = "keepsDisplayOn"
+    private static let onlyOnACPowerKey = "onlyOnACPower"
 
     init(
         service: any PowerAssertionService = SystemPowerAssertions(),
         defaults: UserDefaults = .standard,
         now: @escaping () -> Date = { .now },
         sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
-        appWatcher: any AppQuitWatcher = SystemAppQuitWatcher()
+        appWatcher: any AppQuitWatcher = SystemAppQuitWatcher(),
+        powerSource: any PowerSourceService = SystemPowerSource()
     ) {
         self.service = service
         self.defaults = defaults
         self.now = now
         self.sleep = sleep
         self.appWatcher = appWatcher
+        self.powerSource = powerSource
         keepsDisplayOn = defaults.object(forKey: Self.keepsDisplayOnKey) as? Bool ?? true
+        onlyOnACPower = defaults.bool(forKey: Self.onlyOnACPowerKey)
+        powerSource.observeChanges { [weak self] in self?.pauseOrResume() }
     }
 
     /// Starts a session for `option`, replacing any active one.
@@ -67,34 +88,56 @@ final class AwakeController {
         endTask?.cancel()
         endTask = nil
         appWatcher.stopWatching()
-        if let holdID { service.release(holdID) }
-        holdID = nil
+        releaseHold()
         state = .off
         activeOption = nil
         minutesLeft = nil
     }
 
-    /// Holds the Mac awake in the current mode until `end`.
-    /// The new hold is acquired before the previous one is released, so there is never a gap.
+    /// Holds the Mac awake in the current mode until `end` or, while the session must pause,
+    /// holds nothing and keeps the session. A new hold is acquired before the previous one is
+    /// released, so there is never a gap.
     private func hold(until end: SessionEnd) {
         let remaining = end.endDate.map { $0.timeIntervalSince(now()) }
         if let remaining, remaining <= 0 { return stop() }
-        do {
-            let newID = try service.acquire(
-                keepsDisplayOn: keepsDisplayOn,
-                // Whole seconds, rounded up so a fraction of a second never becomes 0 (no timeout).
-                timeout: remaining?.rounded(.up) ?? 0,
-                details: holdDetails(until: end)
-            )
-            if let holdID { service.release(holdID) }
-            holdID = newID
-            state = .on(until: end, paused: false)
-            minutesLeft = remaining.map { Self.shownMinutes(remaining: $0) }
-            scheduleEnd(at: end.endDate)
-        } catch {
-            // Releases the previous hold too: Weiki never shows a session it isn't holding.
-            stop()
+        let paused = mustPause
+        if paused {
+            releaseHold()
+        } else {
+            do {
+                let newID = try service.acquire(
+                    keepsDisplayOn: keepsDisplayOn,
+                    // Whole seconds, rounded up so a fraction of a second never becomes 0 (no timeout).
+                    timeout: remaining?.rounded(.up) ?? 0,
+                    details: holdDetails(until: end)
+                )
+                releaseHold()
+                holdID = newID
+            } catch {
+                // Releases the previous hold too: Weiki never shows a session it isn't holding.
+                return stop()
+            }
         }
+        state = .on(until: end, paused: paused)
+        minutesLeft = remaining.map { Self.shownMinutes(remaining: $0) }
+        scheduleEnd(at: end.endDate)
+    }
+
+    private func releaseHold() {
+        if let holdID { service.release(holdID) }
+        holdID = nil
+    }
+
+    /// Whether sessions must hold nothing: "Only on AC Power" is on and the Mac runs on battery.
+    private var mustPause: Bool {
+        onlyOnACPower && !powerSource.isOnACPower
+    }
+
+    /// Pauses or resumes the session after the power source or "Only on AC Power" changed.
+    /// A report that doesn't change whether it must pause leaves the hold alone.
+    private func pauseOrResume() {
+        guard case .on(let end, let paused) = state, paused != mustPause else { return }
+        hold(until: end)
     }
 
     /// Watches the app the session waits for, if any, and otherwise stops watching.

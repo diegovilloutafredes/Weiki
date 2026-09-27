@@ -33,7 +33,7 @@
 
 ## 4. Only on AC Power
 
-- [ ] 4.1 Write `AwakeController` tests first, with a fake `PowerSourceService`. They cover every scenario in `specs/ac-power-only`:
+- [x] 4.1 Write `AwakeController` tests first, with a fake `PowerSourceService`. They cover every scenario in `specs/ac-power-only`:
   - unplugging pauses (no hold, same end time)
   - starting on battery starts paused
   - turning the setting on while on battery pauses
@@ -45,9 +45,11 @@
   - the setting defaults to off and persists
 
   Then implement `PowerSourceService`, `SystemPowerSource`, and the pausing in `hold` (design Decisions 4 and 5). Verify that `make test` passes.
-- [ ] 4.2 Add the "Only on AC Power" item and the paused label and status line (design Decision 7). Verify with `make run` and `pmset -g assertions` on AC power that turning the setting on changes nothing while plugged in.
+- [x] 4.2 Add the "Only on AC Power" item and the paused label and status line (design Decision 7). Verify with `make run` and `pmset -g assertions` on AC power that turning the setting on changes nothing while plugged in.
 - [ ] 4.3 By hand (needs a person with a laptop): with the setting on, unplug during a timed session and check that the cup is outlined, the status line reads "Paused on battery, until …", and `pmset -g assertions` lists no Weiki hold. Plug in again and check that one hold returns, with a timeout for the remaining time.
-- [ ] 4.4 Add the power-source seam, the pausing rule, and `SystemPowerSource` as the second file that imports IOKit to the project notes. Verify that the text matches the code.
+
+  Not done yet: it needs someone to unplug the Mac. On AC power, turning the setting on kept the same hold (checked with `pmset`), and a user process can't fake the power-source notification.
+- [x] 4.4 Add the power-source seam, the pausing rule, and `SystemPowerSource` as the second file that imports IOKit to the project notes. Verify that the text matches the code.
 
 ## 5. Notify When Time's Up
 
