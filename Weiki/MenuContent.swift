@@ -5,6 +5,7 @@ import SwiftUI
 struct MenuContent: View {
     @Bindable var controller: AwakeController
     let today: Today
+    let runningApps: RunningApps
     let loginItem: LoginItem
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
@@ -16,14 +17,23 @@ struct MenuContent: View {
         }
         // A menu Section brings its own separators.
         Section("Keep Awake For") {
-            optionItem("Indefinitely", .indefinitely)
-            optionItem("15 Minutes", .fifteenMinutes)
-            optionItem("1 Hour", .oneHour)
-            optionItem("2 Hours", .twoHours)
+            Toggle("Indefinitely", isOn: isActive(.indefinitely))
+            Toggle("15 Minutes", isOn: isActive(.fifteenMinutes))
+            Toggle("1 Hour", isOn: isActive(.oneHour))
+            Toggle("2 Hours", isOn: isActive(.twoHours))
             Toggle("Custom…", isOn: Binding(
                 get: { if case .custom? = controller.activeOption { true } else { false } },
                 set: { _ in openCustomDuration() }
             ))
+            Menu("Until an App Quits") {
+                if runningApps.apps.isEmpty {
+                    Text("No Apps Running")
+                } else {
+                    ForEach(runningApps.apps) { app in
+                        Toggle(app.name, isOn: isActive(.untilQuit(app)))
+                    }
+                }
+            }
         }
         Toggle("Keep Display On", isOn: $controller.keepsDisplayOn)
         Toggle("Launch at Login", isOn: Binding(
@@ -34,13 +44,13 @@ struct MenuContent: View {
         Button("Quit Weiki") { NSApplication.shared.terminate(nil) }
     }
 
-    /// A duration choice, checked while its session is active. Choosing it, checked or
-    /// not, starts that session from now.
-    private func optionItem(_ title: LocalizedStringKey, _ option: DurationOption) -> some View {
-        Toggle(title, isOn: Binding(
+    /// Checked while `option` started the active session. Choosing it, checked or not,
+    /// starts that session from now.
+    private func isActive(_ option: DurationOption) -> Binding<Bool> {
+        Binding(
             get: { controller.activeOption == option },
             set: { _ in controller.start(option) }
-        ))
+        )
     }
 
     private func openCustomDuration() {

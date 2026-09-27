@@ -16,7 +16,9 @@ enum SessionEnd: Hashable {
 }
 
 /// A running app a session can wait for: its process, and its name for the menu and the menu bar.
-struct WatchedApp: Hashable {
+struct WatchedApp: Hashable, Identifiable {
     let processIdentifier: pid_t
     let name: String
+
+    var id: pid_t { processIdentifier }
 }

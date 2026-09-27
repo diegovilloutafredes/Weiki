@@ -4,11 +4,12 @@ import SwiftUI
 struct WeikiApp: App {
     @State private var controller = AwakeController()
     @State private var today = Today()
+    @State private var runningApps = RunningApps()
     @State private var loginItem = LoginItem()
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContent(controller: controller, today: today, loginItem: loginItem)
+            MenuContent(controller: controller, today: today, runningApps: runningApps, loginItem: loginItem)
         } label: {
             MenuBarLabel(controller: controller, today: today)
         }

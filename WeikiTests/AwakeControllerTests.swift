@@ -13,6 +13,9 @@ final class TestClock {
     private let defaults: UserDefaults
     private let service = RecordingPowerAssertions()
     private let clock = TestClock()
+    private let appWatcher = FakeAppQuitWatcher()
+    private let xcode = WatchedApp(processIdentifier: 501, name: "Xcode")
+    private let keynote = WatchedApp(processIdentifier: 502, name: "Keynote")
 
     init() {
         defaults = UserDefaults(suiteName: suiteName)!
@@ -23,7 +26,7 @@ final class TestClock {
     }
 
     private func makeController() -> AwakeController {
-        AwakeController(service: service, defaults: defaults, now: { [clock] in clock.now })
+        AwakeController(service: service, defaults: defaults, now: { [clock] in clock.now }, appWatcher: appWatcher)
     }
 
     // MARK: - Starting and stopping
@@ -352,6 +355,99 @@ final class TestClock {
         #expect(probe.sleeps == [.seconds(30), .seconds(60), .seconds(60)])
         #expect(probe.minutesLeftAtEachSleep == [3, 2, 1])
         #expect(controller.minutesLeft == nil)
+    }
+
+    // MARK: - Until an app quits
+
+    @Test func choosingAnAppHoldsWithoutTimeoutUntilItQuits() {
+        let controller = makeController()
+
+        controller.start(.untilQuit(xcode))
+
+        #expect(controller.state == .on(until: .appQuits(xcode), paused: false))
+        #expect(controller.activeOption == .untilQuit(xcode))
+        #expect(controller.minutesLeft == nil)
+        #expect(service.calls == [.acquire(keepsDisplayOn: true, timeout: 0)])
+        #expect(service.details == ["Display kept on, until Xcode quits"])
+        #expect(appWatcher.watched == xcode)
+    }
+
+    @Test func theAppQuittingTurnsTheSessionOff() {
+        let controller = makeController()
+        controller.start(.untilQuit(xcode))
+
+        appWatcher.quitWatchedApp()
+
+        #expect(controller.state == .off)
+        #expect(controller.activeOption == nil)
+        #expect(service.heldIDs.isEmpty)
+        #expect(appWatcher.watched == nil)
+    }
+
+    @Test func anAppThatHasAlreadyQuitStartsNoSession() {
+        let controller = makeController()
+        appWatcher.quitApps = [xcode]
+
+        controller.start(.untilQuit(xcode))
+
+        #expect(controller.state == .off)
+        #expect(controller.activeOption == nil)
+        #expect(service.heldIDs.isEmpty)
+    }
+
+    @Test func choosingAnotherAppWatchesItInstead() {
+        let controller = makeController()
+        controller.start(.untilQuit(xcode))
+
+        controller.start(.untilQuit(keynote))
+
+        #expect(controller.state == .on(until: .appQuits(keynote), paused: false))
+        #expect(appWatcher.watched == keynote)
+        #expect(service.heldIDs == [2])
+    }
+
+    @Test func replacingTheSessionStopsTheWatch() {
+        let controller = makeController()
+        controller.start(.untilQuit(xcode))
+
+        controller.start(.oneHour)
+
+        #expect(appWatcher.watched == nil)
+    }
+
+    @Test func turningOffStopsTheWatch() {
+        let controller = makeController()
+        controller.start(.untilQuit(xcode))
+
+        controller.stop()
+
+        #expect(appWatcher.watched == nil)
+    }
+
+    /// The system may deliver the quit after the session moved on; it must not end the new one.
+    @Test func aLateQuitForAReplacedAppChangesNothing() throws {
+        let controller = makeController()
+        controller.start(.untilQuit(xcode))
+        let lateOnQuit = try #require(appWatcher.latestOnQuit)
+        controller.start(.oneHour)
+        let oneHourSession = controller.state
+
+        lateOnQuit()
+
+        #expect(controller.state == oneHourSession)
+        #expect(controller.activeOption == .oneHour)
+        #expect(service.heldIDs == [2])
+    }
+
+    @Test func modeChangeKeepsWaitingForTheApp() {
+        let controller = makeController()
+        controller.start(.untilQuit(xcode))
+
+        controller.keepsDisplayOn = false
+
+        #expect(controller.state == .on(until: .appQuits(xcode), paused: false))
+        #expect(service.details.last == "Display allowed to sleep, until Xcode quits")
+        #expect(appWatcher.watched == xcode)
     }
 }
 

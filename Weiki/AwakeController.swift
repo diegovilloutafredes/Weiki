@@ -1,9 +1,10 @@
 import Foundation
 import Observation
 
-/// Keep-awake sessions: the current hold, when it ends, and the display-mode setting.
+/// Keep-awake sessions: the current hold, what ends it (a date, or an app quitting), and the
+/// display-mode setting.
 ///
-/// The end date is the source of truth for when a session ends. The timeout each hold
+/// The end date is the source of truth for when a timed session ends. The timeout each hold
 /// carries on the system side is only a safety net in case Weiki stops responding.
 @Observable
 final class AwakeController {
@@ -32,6 +33,7 @@ final class AwakeController {
     private let defaults: UserDefaults
     private let now: () -> Date
     private let sleep: (Duration) async throws -> Void
+    private let appWatcher: any AppQuitWatcher
     @ObservationIgnored private var holdID: UInt32?
     @ObservationIgnored private var endTask: Task<Void, Never>?
 
@@ -41,12 +43,14 @@ final class AwakeController {
         service: any PowerAssertionService = SystemPowerAssertions(),
         defaults: UserDefaults = .standard,
         now: @escaping () -> Date = { .now },
-        sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        appWatcher: any AppQuitWatcher = SystemAppQuitWatcher()
     ) {
         self.service = service
         self.defaults = defaults
         self.now = now
         self.sleep = sleep
+        self.appWatcher = appWatcher
         keepsDisplayOn = defaults.object(forKey: Self.keepsDisplayOnKey) as? Bool ?? true
     }
 
@@ -55,12 +59,14 @@ final class AwakeController {
         // Set first: if the hold is refused, `hold` turns off, which clears it again.
         activeOption = option
         hold(until: option.end(startingAt: now()))
+        watchForTheAppToQuit()
     }
 
     /// Ends the session and releases its hold.
     func stop() {
         endTask?.cancel()
         endTask = nil
+        appWatcher.stopWatching()
         if let holdID { service.release(holdID) }
         holdID = nil
         state = .off
@@ -89,6 +95,19 @@ final class AwakeController {
             // Releases the previous hold too: Weiki never shows a session it isn't holding.
             stop()
         }
+    }
+
+    /// Watches the app the session waits for, if any, and otherwise stops watching.
+    private func watchForTheAppToQuit() {
+        guard case .on(until: .appQuits(let app), _) = state else { return appWatcher.stopWatching() }
+        appWatcher.watch(app) { [weak self] in self?.appDidQuit(app) }
+    }
+
+    /// Ends the session if it still waits for `app`. A late report, for an app the session no
+    /// longer waits for, changes nothing.
+    private func appDidQuit(_ app: WatchedApp) {
+        guard case .on(until: .appQuits(app), _) = state else { return }
+        stop()
     }
 
     /// What `pmset -g assertions` shows for the hold: the mode and when it ends.

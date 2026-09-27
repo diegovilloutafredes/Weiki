@@ -17,19 +17,19 @@
 
 ## 3. Until an App Quits
 
-- [ ] 3.1 Write `AwakeController` tests first, with a fake `AppQuitWatcher`:
+- [x] 3.1 Write `AwakeController` tests first, with a fake `AppQuitWatcher`:
   - choosing an app starts `.appQuits` with no timeout and hold details that name the app
   - the app quitting turns the session off and clears `activeOption`
   - replacing or turning off the session stops the watch, and a late callback for the old app changes nothing
   - an app that has already terminated starts no session
 
   Then implement `AppQuitWatcher` and `SystemAppQuitWatcher` (design Decision 2). Verify that `make test` passes.
-- [ ] 3.2 Add `RunningApps` and the "Until an App Quits" submenu, with "No Apps Running" when the list is empty and a checkmark on the chosen app (design Decisions 3 and 7). Check with `make run`, System Events, and `pmset -g assertions`:
+- [x] 3.2 Add `RunningApps` and the "Until an App Quits" submenu, with "No Apps Running" when the list is empty and a checkmark on the chosen app (design Decisions 3 and 7). Check with `make run`, System Events, and `pmset -g assertions`:
   - the submenu lists Dock apps in alphabetical order
   - it follows TextEdit launching and quitting
   - choosing TextEdit shows "Awake until TextEdit quits" and "TextEdit" in the menu bar, and holds with no timeout
   - quitting TextEdit turns the session off within a second
-- [ ] 3.3 Add `RunningApps`, the watcher, and the "follows the chosen process" rule to the project notes. Verify that the text matches the code.
+- [x] 3.3 Add `RunningApps`, the watcher, and the "follows the chosen process" rule to the project notes. Verify that the text matches the code.
 
 ## 4. Only on AC Power
 
