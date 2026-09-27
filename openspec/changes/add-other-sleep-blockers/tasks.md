@@ -2,7 +2,7 @@
 
 ## 1. Before starting
 
-- [ ] 1.1 Check design Decision 1 with a throwaway change: a counter in the status line, bumped on `NSMenu.didBeginTrackingNotification`. Read the status line through System Events on three openings. Record under Open Questions in `design.md` whether each opening shows its own count. If they don't, switch the design to the fallback before going on.
+- [x] 1.1 Check design Decision 1 with a throwaway change: a counter in the status line, bumped on `NSMenu.didBeginTrackingNotification`. Read the status line through System Events on three openings. Record under Open Questions in `design.md` whether each opening shows its own count. If they don't, switch the design to the fallback before going on.
 
 ## 2. What counts
 

@@ -64,4 +64,5 @@ Section("Also Keeping the Mac Awake") { Text("\(name) — keeps the display on")
 
 ## Open Questions
 
+- *Answered (task 1.1):* a counter bumped on `NSMenu.didBeginTrackingNotification` showed in the status line of the menu that was opening, on each opening (read through System Events three times as #1, #2, #3, and seen in a screenshot 0.35 s after opening). Refreshing on open works, so the timer fallback isn't needed.
 - Whether to add each process's reason (the assertion's name, such as "Video Wake Lock") as a second line, if the menu can show it.
