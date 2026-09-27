@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  # Keep in sync with build.yml
+  XCODE_PATH: /Applications/Xcode_26.5.app
+
+jobs:
+  release:
+    runs-on: macos-26
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+
+      - name: Install XcodeGen
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+
+      # `make tag` pushes main and the tag together, so this run and the Build
+      # run start at the same time. Testing here keeps a release from shipping
+      # a commit whose Build run later fails.
+      - name: Test
+        run: make test
+
+      - name: Build and package
+        run: make release
+
+      # A tag pushed without `make tag` could otherwise publish an app that
+      # reports a different version.
+      - name: Check the version
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" build/Release/Weiki.app/Contents/Info.plist)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Weiki.app is version $version, but the tag is $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+      # The last step, so a failed run publishes nothing.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            build/Weiki.dmg \
+            build/Weiki.zip

@@ -1,0 +1,33 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  # Keep in sync with release.yml
+  XCODE_PATH: /Applications/Xcode_26.5.app
+
+jobs:
+  build:
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+
+      # Weiki.xcodeproj is generated from project.yml and not committed;
+      # `make build` and `make test` generate it.
+      - name: Install XcodeGen
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+
+      # The universal Release build, as `make release` ships it.
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make test

@@ -24,6 +24,23 @@ pmset -g assertions | grep Weiki
 
 macOS 15 or later. Building from source needs Xcode 26 or later and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
+## Install
+
+To install the latest release, or to update to it, run this in Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/diegovilloutafredes/Weiki/main/scripts/install.sh | bash
+```
+
+It downloads the latest release, replaces `/Applications/Weiki.app`, and opens it. If Weiki is running, it quits first, which ends its session.
+
+You can also download `Weiki.dmg` or `Weiki.zip` from [Releases](https://github.com/diegovilloutafredes/Weiki/releases):
+
+- **DMG:** open it and drag Weiki to Applications.
+- **ZIP:** unzip it and double-click `install.command`. It copies Weiki into Applications, clears the quarantine flag, and opens it. If macOS blocks the script, run `bash install.command` in Terminal instead.
+
+Weiki isn't signed with a Developer ID, so macOS blocks the first launch of a copy downloaded in a browser. Try to open it once, then click **Open Anyway** in System Settings > Privacy & Security, or clear the flag yourself with `xattr -dr com.apple.quarantine /Applications/Weiki.app`. The one-line installer avoids this.
+
 ## Build from source
 
 ```bash
