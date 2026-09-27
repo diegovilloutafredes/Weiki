@@ -99,4 +99,5 @@ Its seam, `NotificationService`, has a status read, a permission request, and a 
 
 - The notification's exact wording.
 - Whether app icons in the submenu are worth it later. The specs only require names.
+- *Answered (task 5.2):* the deep link opens System Settings at Weiki's own notification page on macOS 27, so the fallback isn't needed there.
 - *Answered (task 1.2):* a SwiftUI `Menu` inside the `.menu`-style content becomes a real submenu, and its items follow an `@Observable` list that changes while the menu is closed. A throwaway build listed "Finder, Google Chrome, iTerm2, Obsidian, Script Editor", which System Events read from the submenu. TextEdit appeared after it launched and was gone after it quit. No fallback is needed.

@@ -2,14 +2,29 @@ import SwiftUI
 
 @main
 struct WeikiApp: App {
-    @State private var controller = AwakeController()
+    @State private var controller: AwakeController
+    @State private var notifications: EndNotifications
     @State private var today = Today()
     @State private var runningApps = RunningApps()
     @State private var loginItem = LoginItem()
 
+    init() {
+        let notifications = EndNotifications()
+        _notifications = State(initialValue: notifications)
+        _controller = State(initialValue: AwakeController(onTimerEnd: { notifications.timerRanOut(at: $0) }))
+        // Reading the permission never prompts.
+        Task { await notifications.refresh() }
+    }
+
     var body: some Scene {
         MenuBarExtra {
-            MenuContent(controller: controller, today: today, runningApps: runningApps, loginItem: loginItem)
+            MenuContent(
+                controller: controller,
+                today: today,
+                runningApps: runningApps,
+                notifications: notifications,
+                loginItem: loginItem
+            )
         } label: {
             MenuBarLabel(controller: controller, today: today)
         }

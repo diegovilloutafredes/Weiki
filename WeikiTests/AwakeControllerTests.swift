@@ -15,6 +15,7 @@ final class TestClock {
     private let clock = TestClock()
     private let appWatcher = FakeAppQuitWatcher()
     private let power = FakePowerSource()
+    private let timerEnds = TimerEndRecorder()
     private let xcode = WatchedApp(processIdentifier: 501, name: "Xcode")
     private let keynote = WatchedApp(processIdentifier: 502, name: "Keynote")
 
@@ -32,7 +33,8 @@ final class TestClock {
             defaults: defaults,
             now: { [clock] in clock.now },
             appWatcher: appWatcher,
-            powerSource: power
+            powerSource: power,
+            onTimerEnd: { [timerEnds] in timerEnds.dates.append($0) }
         )
     }
 
@@ -605,6 +607,83 @@ final class TestClock {
         #expect(ended)
         #expect(service.calls.isEmpty)
     }
+
+    // MARK: - Timer end
+
+    @Test func aTimedSessionThatRunsOutReportsItsEndOnce() async throws {
+        let probe = LoopProbe()
+        let controller = AwakeController(
+            service: service,
+            defaults: defaults,
+            now: { [clock] in clock.now },
+            sleep: { [probe] duration in
+                probe.sleeps.append(duration)
+                try await Task.sleep(for: .milliseconds(10))
+            },
+            onTimerEnd: { [timerEnds] in timerEnds.dates.append($0) }
+        )
+        let end = clock.now.addingTimeInterval(3600)
+        controller.start(.custom(3600))
+        try #require(await waitUntil { !probe.sleeps.isEmpty })
+
+        // The Mac slept past the end.
+        clock.now += 7200
+
+        #expect(await waitUntil { controller.state == .off })
+        #expect(timerEnds.dates == [end])
+    }
+
+    @Test func aPausedSessionThatRunsOutReportsItsEnd() async {
+        let controller = AwakeController(
+            service: service,
+            defaults: defaults,
+            powerSource: power,
+            onTimerEnd: { [timerEnds] in timerEnds.dates.append($0) }
+        )
+        controller.onlyOnACPower = true
+        power.isOnACPower = false
+
+        controller.start(.custom(0.2))
+
+        #expect(await waitUntil { controller.state == .off })
+        #expect(timerEnds.dates.count == 1)
+    }
+
+    /// The end can pass before the end loop wakes, as right after the Mac wakes; a mode
+    /// change then ends the session, and that's still the timer running out.
+    @Test func anEndFoundOnAModeChangeIsReported() {
+        let controller = makeController()
+        let end = clock.now.addingTimeInterval(60)
+        controller.start(.custom(60))
+        clock.now += 120
+
+        controller.keepsDisplayOn = false
+
+        #expect(controller.state == .off)
+        #expect(timerEnds.dates == [end])
+    }
+
+    @Test func endingAnyOtherWayReportsNothing() {
+        let controller = makeController()
+
+        controller.start(.oneHour)
+        controller.stop()
+        controller.start(.oneHour)
+        controller.start(.indefinitely)
+        service.refusesHolds = true
+        controller.start(.oneHour)
+        service.refusesHolds = false
+        controller.start(.untilQuit(xcode))
+        appWatcher.quitWatchedApp()
+
+        #expect(controller.state == .off)
+        #expect(timerEnds.dates.isEmpty)
+    }
+}
+
+/// The end dates `onTimerEnd` reported, in order.
+final class TimerEndRecorder {
+    var dates: [Date] = []
 }
 
 /// What the end loop did: the sleeps it asked for, and the minutes left each time.

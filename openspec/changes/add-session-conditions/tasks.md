@@ -53,15 +53,19 @@
 
 ## 5. Notify When Time's Up
 
-- [ ] 5.1 Write the tests first, with a fake `NotificationService` and a throwaway `UserDefaults` suite:
+- [x] 5.1 Write the tests first, with a fake `NotificationService` and a throwaway `UserDefaults` suite:
   - the controller calls `onTimerEnd` once when a timed session runs out, including when the end passed during a long sleep of the test clock and while paused
   - it never calls it on Turn Off, a replacement, a refused hold, or the app quitting
   - `EndNotifications`: off by default and persisted; checked only when on and allowed; the first choice asks permission, and a decline leaves it unchecked; a choice after declining opens System Settings through a fake opener and leaves it unchecked
 
   Then implement `NotificationService`, `SystemNotificationService` with its delegate, and `EndNotifications` (design Decision 6). Verify that `make test` passes and never shows a permission prompt.
 - [ ] 5.2 Add the "Notify When Time's Up" item and connect `onTimerEnd` in `WeikiApp`. Verify with `make run`: turning it on shows macOS's prompt, and a 1-minute Custom session then posts "Weiki is off" when it ends.
+
+  Done so far: the item and its wiring are in, and choosing it showed macOS's "“Weiki” Notifications" prompt (checked with a screenshot). Still to do: someone has to click Allow, then a 1-minute session should post the notification.
 - [ ] 5.3 By hand (needs a person): decline the prompt in a fresh setup, then choose the item again and check that System Settings opens at Weiki's notifications (or the Notifications page).
-- [ ] 5.4 Add the notification seam, the delegate rule, and "timers only" to the project notes. Verify that the text matches the code.
+
+  The link itself works: `x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=com.weiki.app` opened System Settings on a "Weiki" page showing "Allow notifications" (macOS 27).
+- [x] 5.4 Add the notification seam, the delegate rule, and "timers only" to the project notes. Verify that the text matches the code.
 
 ## 6. Integration
 

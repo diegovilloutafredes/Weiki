@@ -6,6 +6,7 @@ struct MenuContent: View {
     @Bindable var controller: AwakeController
     let today: Today
     let runningApps: RunningApps
+    let notifications: EndNotifications
     let loginItem: LoginItem
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
@@ -37,6 +38,10 @@ struct MenuContent: View {
         }
         Toggle("Keep Display On", isOn: $controller.keepsDisplayOn)
         Toggle("Only on AC Power", isOn: $controller.onlyOnACPower)
+        Toggle("Notify When Time's Up", isOn: Binding(
+            get: { notifications.isEnabled },
+            set: { enabled in Task { await notifications.setEnabled(enabled) } }
+        ))
         Toggle("Launch at Login", isOn: Binding(
             get: { loginItem.isEnabled },
             set: { loginItem.setEnabled($0) }

@@ -50,6 +50,9 @@ final class AwakeController {
     private let sleep: (Duration) async throws -> Void
     private let appWatcher: any AppQuitWatcher
     private let powerSource: any PowerSourceService
+    /// Told the end date when a timed session runs out, and never when a session ends any
+    /// other way.
+    private let onTimerEnd: (Date) -> Void
     @ObservationIgnored private var holdID: UInt32?
     @ObservationIgnored private var endTask: Task<Void, Never>?
 
@@ -62,7 +65,8 @@ final class AwakeController {
         now: @escaping () -> Date = { .now },
         sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
         appWatcher: any AppQuitWatcher = SystemAppQuitWatcher(),
-        powerSource: any PowerSourceService = SystemPowerSource()
+        powerSource: any PowerSourceService = SystemPowerSource(),
+        onTimerEnd: @escaping (Date) -> Void = { _ in }
     ) {
         self.service = service
         self.defaults = defaults
@@ -70,6 +74,7 @@ final class AwakeController {
         self.sleep = sleep
         self.appWatcher = appWatcher
         self.powerSource = powerSource
+        self.onTimerEnd = onTimerEnd
         keepsDisplayOn = defaults.object(forKey: Self.keepsDisplayOnKey) as? Bool ?? true
         onlyOnACPower = defaults.bool(forKey: Self.onlyOnACPowerKey)
         powerSource.observeChanges { [weak self] in self?.pauseOrResume() }
@@ -99,7 +104,7 @@ final class AwakeController {
     /// released, so there is never a gap.
     private func hold(until end: SessionEnd) {
         let remaining = end.endDate.map { $0.timeIntervalSince(now()) }
-        if let remaining, remaining <= 0 { return stop() }
+        if let endDate = end.endDate, let remaining, remaining <= 0 { return timerRanOut(at: endDate) }
         let paused = mustPause
         if paused {
             releaseHold()
@@ -121,6 +126,12 @@ final class AwakeController {
         state = .on(until: end, paused: paused)
         minutesLeft = remaining.map { Self.shownMinutes(remaining: $0) }
         scheduleEnd(at: end.endDate)
+    }
+
+    /// Ends a timed session whose end has passed, and reports it.
+    private func timerRanOut(at endDate: Date) {
+        stop()
+        onTimerEnd(endDate)
     }
 
     private func releaseHold() {
@@ -180,7 +191,7 @@ final class AwakeController {
                 try? await sleep(.seconds(remaining - Double(minutes - 1) * 60))
             }
             guard !Task.isCancelled else { return }
-            self?.stop()
+            self?.timerRanOut(at: endDate)
         }
     }
 
