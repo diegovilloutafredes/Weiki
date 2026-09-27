@@ -9,8 +9,8 @@ import Observation
 final class AwakeController {
     enum State: Equatable {
         case off
-        /// `until` is nil for an indefinite session.
-        case on(until: Date?)
+        /// `paused` while "Only on AC Power" keeps the session from holding on battery.
+        case on(until: SessionEnd, paused: Bool)
     }
 
     private(set) var state: State = .off
@@ -24,7 +24,7 @@ final class AwakeController {
         didSet {
             guard keepsDisplayOn != oldValue else { return }
             defaults.set(keepsDisplayOn, forKey: Self.keepsDisplayOnKey)
-            if case .on(let endDate) = state { hold(until: endDate) }
+            if case .on(let end, _) = state { hold(until: end) }
         }
     }
 
@@ -54,7 +54,7 @@ final class AwakeController {
     func start(_ option: DurationOption) {
         // Set first: if the hold is refused, `hold` turns off, which clears it again.
         activeOption = option
-        hold(until: option.duration.map { now().addingTimeInterval($0) })
+        hold(until: option.end(startingAt: now()))
     }
 
     /// Ends the session and releases its hold.
@@ -68,27 +68,23 @@ final class AwakeController {
         minutesLeft = nil
     }
 
-    /// Holds the Mac awake in the current mode until `endDate`, or indefinitely when nil.
+    /// Holds the Mac awake in the current mode until `end`.
     /// The new hold is acquired before the previous one is released, so there is never a gap.
-    private func hold(until endDate: Date?) {
-        var timeout: TimeInterval = 0
-        if let endDate {
-            let remaining = endDate.timeIntervalSince(now())
-            guard remaining > 0 else { return stop() }
-            // Whole seconds, rounded up so a fraction of a second never becomes 0 (no timeout).
-            timeout = remaining.rounded(.up)
-        }
+    private func hold(until end: SessionEnd) {
+        let remaining = end.endDate.map { $0.timeIntervalSince(now()) }
+        if let remaining, remaining <= 0 { return stop() }
         do {
             let newID = try service.acquire(
                 keepsDisplayOn: keepsDisplayOn,
-                timeout: timeout,
-                details: holdDetails(until: endDate)
+                // Whole seconds, rounded up so a fraction of a second never becomes 0 (no timeout).
+                timeout: remaining?.rounded(.up) ?? 0,
+                details: holdDetails(until: end)
             )
             if let holdID { service.release(holdID) }
             holdID = newID
-            state = .on(until: endDate)
-            minutesLeft = endDate.map { Self.shownMinutes(remaining: $0.timeIntervalSince(now())) }
-            scheduleEnd(at: endDate)
+            state = .on(until: end, paused: false)
+            minutesLeft = remaining.map { Self.shownMinutes(remaining: $0) }
+            scheduleEnd(at: end.endDate)
         } catch {
             // Releases the previous hold too: Weiki never shows a session it isn't holding.
             stop()
@@ -96,10 +92,13 @@ final class AwakeController {
     }
 
     /// What `pmset -g assertions` shows for the hold: the mode and when it ends.
-    private func holdDetails(until endDate: Date?) -> String {
+    private func holdDetails(until end: SessionEnd) -> String {
         let mode = keepsDisplayOn ? "Display kept on" : "Display allowed to sleep"
-        guard let endDate else { return "\(mode), indefinitely" }
-        return "\(mode), until \(endDate.endTimeDescription(now: now()))"
+        return switch end {
+        case .never: "\(mode), indefinitely"
+        case .date(let endDate): "\(mode), until \(endDate.endTimeDescription(now: now()))"
+        case .appQuits(let app): "\(mode), until \(app.name) quits"
+        }
     }
 
     /// Counts `minutesLeft` down and turns the session off once `endDate` passes. It wakes each

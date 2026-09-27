@@ -40,7 +40,7 @@ final class TestClock {
 
         controller.start(.indefinitely)
 
-        #expect(controller.state == .on(until: nil))
+        #expect(controller.state == .on(until: .never, paused: false))
         #expect(service.calls == [.acquire(keepsDisplayOn: true, timeout: 0)])
         #expect(service.details == ["Display kept on, indefinitely"])
     }
@@ -51,7 +51,7 @@ final class TestClock {
 
         controller.start(.custom(3600))
 
-        #expect(controller.state == .on(until: start.addingTimeInterval(3600)))
+        #expect(controller.state == .on(until: .date(start.addingTimeInterval(3600)), paused: false))
         #expect(service.calls == [.acquire(keepsDisplayOn: true, timeout: 3600)])
         #expect(service.details.first?.hasPrefix("Display kept on, until ") == true)
     }
@@ -71,7 +71,7 @@ final class TestClock {
 
         controller.start(.custom(900))
 
-        #expect(controller.state == .on(until: clock.now.addingTimeInterval(900)))
+        #expect(controller.state == .on(until: .date(clock.now.addingTimeInterval(900)), paused: false))
         #expect(service.calls == [
             .acquire(keepsDisplayOn: true, timeout: 0),
             .acquire(keepsDisplayOn: true, timeout: 900),
@@ -110,7 +110,7 @@ final class TestClock {
 
         controller.keepsDisplayOn = false
 
-        #expect(controller.state == .on(until: start.addingTimeInterval(3600)))
+        #expect(controller.state == .on(until: .date(start.addingTimeInterval(3600)), paused: false))
         #expect(service.calls == [
             .acquire(keepsDisplayOn: true, timeout: 3600),
             .acquire(keepsDisplayOn: false, timeout: 3000),
@@ -219,7 +219,7 @@ final class TestClock {
         controller.start(.indefinitely)
         try await Task.sleep(for: .milliseconds(400))
 
-        #expect(controller.state == .on(until: nil))
+        #expect(controller.state == .on(until: .never, paused: false))
         #expect(service.heldIDs == [2])
     }
 

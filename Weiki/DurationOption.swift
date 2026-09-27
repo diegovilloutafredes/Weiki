@@ -7,15 +7,17 @@ enum DurationOption: Hashable {
     case oneHour
     case twoHours
     case custom(TimeInterval)
+    case untilQuit(WatchedApp)
 
-    /// How long a session started from this option lasts, in seconds; nil for no end.
-    var duration: TimeInterval? {
+    /// When a session started from this option at `start` ends.
+    func end(startingAt start: Date) -> SessionEnd {
         switch self {
-        case .indefinitely: nil
-        case .fifteenMinutes: 15 * 60
-        case .oneHour: 60 * 60
-        case .twoHours: 2 * 60 * 60
-        case .custom(let seconds): seconds
+        case .indefinitely: .never
+        case .fifteenMinutes: .date(start.addingTimeInterval(15 * 60))
+        case .oneHour: .date(start.addingTimeInterval(60 * 60))
+        case .twoHours: .date(start.addingTimeInterval(2 * 60 * 60))
+        case .custom(let seconds): .date(start.addingTimeInterval(seconds))
+        case .untilQuit(let app): .appQuits(app)
         }
     }
 }

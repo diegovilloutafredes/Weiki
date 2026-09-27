@@ -3,17 +3,17 @@
 ## 1. Before starting
 
 - [ ] 1.1 Archive `add-keep-awake-menu` once its manual check (task 7.3) is done, so that `menu-bar-controls` exists as a main spec. Verify that `openspec validate add-session-conditions --strict` no longer reports that archive would refuse the `menu-bar-controls` delta.
-- [ ] 1.2 Check design Decision 3's assumption with a throwaway change: a SwiftUI `Menu` inside the `.menu`-style content becomes a submenu, and its items follow an `@Observable` list that changes while the menu is closed. Read the submenu's items through System Events before and after launching TextEdit. Record the answer under Open Questions in `design.md`. If it fails, switch the specs and design to the fallback before going on.
+- [x] 1.2 Check design Decision 3's assumption with a throwaway change: a SwiftUI `Menu` inside the `.menu`-style content becomes a submenu, and its items follow an `@Observable` list that changes while the menu is closed. Read the submenu's items through System Events before and after launching TextEdit. Record the answer under Open Questions in `design.md`. If it fails, switch the specs and design to the fallback before going on.
 
 ## 2. One session value
 
-- [ ] 2.1 Write the tests first:
+- [x] 2.1 Write the tests first:
   - `statusLine(now:)` for a session waiting for an app, and for paused indefinite, timed, and app sessions, in `en_US` with a 24-hour clock ("Awake until Xcode quits", "Paused on battery", "Paused on battery, until 14:35", "Paused on battery, until Xcode quits")
   - the label text for app names ("Xcode", and "Visual Stu…" for "Visual Studio Code")
   - the existing status line and time-left tests, unchanged
 
   Then change `State`, `SessionEnd`, and `DurationOption` per design Decision 1, and update every use of `State`. Verify that `make test` passes with no warnings.
-- [ ] 2.2 Update the project notes' Architecture section for the new `State`. Verify that the text matches the code.
+- [x] 2.2 Update the project notes' Architecture section for the new `State`. Verify that the text matches the code.
 
 ## 3. Until an App Quits
 

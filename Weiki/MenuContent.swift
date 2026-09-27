@@ -52,24 +52,16 @@ struct MenuContent: View {
     }
 }
 
-/// The menu bar icon: an outlined cup while off; while on, a filled cup followed by "∞"
-/// or the time left ("42m").
+/// The menu bar icon: an outlined cup while off; while on, a filled cup followed by "∞",
+/// the time left ("42m"), or the app the session waits for.
 struct MenuBarLabel: View {
     let controller: AwakeController
     let today: Today
 
     var body: some View {
         let state = controller.state
-        Image(nsImage: MenuBarIcon.image(filled: state != .off, text: text))
+        Image(nsImage: MenuBarIcon.image(filled: state != .off, text: state.menuBarText(minutesLeft: controller.minutesLeft)))
             .accessibilityLabel(state == .off ? Text("Weiki, off") : Text("Weiki, \(state.statusLine(now: today.date))"))
-    }
-
-    private var text: String? {
-        switch controller.state {
-        case .off: nil
-        case .on(until: nil): "∞"
-        case .on: controller.minutesLeft.map { timeLeftText(minutes: $0) }
-        }
     }
 }
 
