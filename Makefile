@@ -6,6 +6,8 @@ DIST_DIR  = build/dist
 DMG       = build/Weiki.dmg
 ZIP       = build/Weiki.zip
 ARCH     := $(shell uname -m)
+# bash for `set -o pipefail` in `test`; /bin/sh can be another shell.
+SHELL    := /bin/bash
 
 # Ad-hoc signing, locally and on CI (releases ship it too).
 # To build unsigned: make build SIGNING_FLAGS="CODE_SIGNING_ALLOWED=NO"
@@ -38,14 +40,20 @@ build: generate
 	           $(SIGNING_FLAGS)
 
 # ── Test ─────────────────────────────────────────────────────────────────────
+# When a test crashes the test host, xcodebuild relaunches it and skips that
+# test, and it can still report success, so a relaunch in the log fails the run.
 
 test: generate
 	@echo "==> Running tests..."
-	xcodebuild test \
+	@mkdir -p build
+	set -o pipefail; xcodebuild test \
 	           -project $(PROJECT) \
 	           -scheme $(SCHEME) \
 	           -destination 'platform=macOS,arch=$(ARCH)' \
-	           $(SIGNING_FLAGS)
+	           $(SIGNING_FLAGS) 2>&1 | tee build/test.log
+	@if grep -q "Restarting after unexpected exit" build/test.log; then \
+	  echo "error: the test host was relaunched after a crash or a timeout (see build/test.log)"; exit 1; \
+	fi
 
 # ── Packaging ────────────────────────────────────────────────────────────────
 # The files a GitHub release carries; the Release workflow runs `make release`.
