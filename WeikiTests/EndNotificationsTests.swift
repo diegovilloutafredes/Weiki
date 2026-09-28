@@ -25,21 +25,12 @@ final class FakeNotificationService: NotificationService {
     func post(title: String, body: String) { posts.append((title, body)) }
 }
 
-@Suite final class EndNotificationsTests {
-    private let suiteName = "WeikiTests-\(UUID().uuidString)"
-    private let defaults: UserDefaults
+struct EndNotificationsTests {
+    private let testDefaults = TestDefaults()
     private let service = FakeNotificationService()
 
-    init() {
-        defaults = UserDefaults(suiteName: suiteName)!
-    }
-
-    deinit {
-        UserDefaults.standard.removePersistentDomain(forName: suiteName)
-    }
-
     private func makeNotifications() async -> EndNotifications {
-        let notifications = EndNotifications(service: service, defaults: defaults)
+        let notifications = EndNotifications(service: service, defaults: testDefaults.defaults)
         await notifications.refresh()
         return notifications
     }

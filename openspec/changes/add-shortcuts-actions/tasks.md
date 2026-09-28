@@ -21,7 +21,7 @@
   - durations under 1 minute or over 24 hours throw and leave the active session as it was
   - an app that isn't running throws an error that names it, and changes nothing
   - a refused hold makes the action throw, so it never reports a session that isn't there
-  - `RunningApps.newestInstance(of:among:)` finds the newest running copy of an app, with or without a Dock icon
+  - `ShortcutActions.newestInstance(of:among:)` finds the newest running copy of an app, with or without a Dock icon
   - ("Turn Off Weiki" is `stop()`, and the status action returns `state.isHolding`, both covered by the controller tests.)
 
   Then implement `ShortcutActions` and `ShortcutError` (design Decisions 1 and 5). Verify that `make test` passes.

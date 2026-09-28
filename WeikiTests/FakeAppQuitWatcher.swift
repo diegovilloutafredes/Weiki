@@ -7,14 +7,17 @@ final class FakeAppQuitWatcher: AppQuitWatcher {
     /// The callback passed to the latest `watch`, kept even after `stopWatching()`, so a test
     /// can deliver it late, as the system might.
     private(set) var latestOnQuit: (@MainActor () -> Void)?
-    /// Apps that have already quit: watching one reports its quit before `watch` returns, as the
-    /// real watcher does.
+    /// Apps that have already quit: `watch` refuses them, as the real watcher does.
     var quitApps: Set<WatchedApp> = []
 
-    func watch(_ app: WatchedApp, onQuit: @escaping @MainActor () -> Void) {
+    func watch(_ app: WatchedApp, onQuit: @escaping @MainActor () -> Void) -> Bool {
+        guard !quitApps.contains(app) else {
+            watched = nil
+            return false
+        }
         watched = app
         latestOnQuit = onQuit
-        if quitApps.contains(app) { onQuit() }
+        return true
     }
 
     func stopWatching() {

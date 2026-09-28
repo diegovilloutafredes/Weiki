@@ -26,8 +26,6 @@ struct SystemPowerSource: PowerSourceService {
             MainActor.assumeIsolated { onChange() }
         }
         // A change during sleep can go unreported, so read the source again on wake.
-        _ = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated { onChange() }
-        }
+        observeForever(NSWorkspace.didWakeNotification, in: NSWorkspace.shared.notificationCenter, onChange)
     }
 }

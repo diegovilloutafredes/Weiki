@@ -12,48 +12,42 @@ struct SleepBlockersTests {
         SleepBlockers.list(from: assertions, appName: { appNames[$0] }, excluding: weiki)
     }
 
-    private func process(_ name: String?, _ effects: AssertionEffect...) -> ProcessAssertions {
-        ProcessAssertions(processName: name, effects: effects)
+    private func process(_ name: String?, keepsDisplayOn: Bool = false) -> ProcessAssertions {
+        ProcessAssertions(processName: name, keepsDisplayOn: keepsDisplayOn)
     }
 
     @Test func listsEachProcessWithWhatItKeepsAwake() {
-        #expect(list([10: process("caffeinate", .keepsMacAwake), 20: process("zoom.us", .keepsDisplayOn)]) == [
+        #expect(list([10: process("caffeinate"), 20: process("zoom.us", keepsDisplayOn: true)]) == [
             SleepBlocker(name: "caffeinate", keepsDisplayOn: false),
             SleepBlocker(name: "zoom.us", keepsDisplayOn: true),
         ])
     }
 
     @Test func leavesOutWeikiAndThePowerManager() {
-        #expect(list([30: process("powerd", .keepsMacAwake), weiki: process("Weiki", .keepsDisplayOn)]).isEmpty)
-    }
-
-    @Test func aProcessThatKeepsBothReadsAsKeepingTheDisplayOn() {
-        #expect(list([50: process("coreaudiod", .keepsMacAwake, .keepsDisplayOn)]) == [
-            SleepBlocker(name: "coreaudiod", keepsDisplayOn: true),
-        ])
+        #expect(list([30: process("powerd"), weiki: process("Weiki", keepsDisplayOn: true)]).isEmpty)
     }
 
     @Test func processesWithOneNameShareAnItem() {
-        #expect(list([10: process("caffeinate", .keepsMacAwake), 11: process("caffeinate", .keepsDisplayOn)]) == [
+        #expect(list([10: process("caffeinate"), 11: process("caffeinate", keepsDisplayOn: true)]) == [
             SleepBlocker(name: "caffeinate", keepsDisplayOn: true),
         ])
     }
 
     /// An app goes by its Dock name rather than its executable's.
     @Test func anAppGoesByItsDockName() {
-        #expect(list([21: process("Xcode-beta", .keepsMacAwake)]).map(\.name) == ["Xcode"])
+        #expect(list([21: process("Xcode-beta")]).map(\.name) == ["Xcode"])
     }
 
-    @Test func leavesOutProcessesWithoutEffectsOrNames() {
-        #expect(list([10: process("caffeinate"), 99: process(nil, .keepsDisplayOn)]).isEmpty)
+    @Test func leavesOutProcessesWithoutNames() {
+        #expect(list([99: process(nil, keepsDisplayOn: true)]).isEmpty)
     }
 
     /// Sorted the way Finder sorts names, so "iTerm2" comes before "Xcode" and "zoom.us".
     @Test func sortsLikeFinder() {
         let assertions: [pid_t: ProcessAssertions] = [
-            20: process("zoom.us", .keepsDisplayOn),
-            21: process("Xcode", .keepsMacAwake),
-            22: process("iTerm2", .keepsMacAwake),
+            20: process("zoom.us", keepsDisplayOn: true),
+            21: process("Xcode"),
+            22: process("iTerm2"),
         ]
 
         #expect(list(assertions).map(\.name) == ["iTerm2", "Xcode", "zoom.us"])

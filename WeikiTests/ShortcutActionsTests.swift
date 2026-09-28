@@ -3,23 +3,18 @@ import Testing
 @testable import Weiki
 
 /// What the Shortcuts actions start, apart from the App Intents glue.
-@Suite final class ShortcutActionsTests {
-    private let suiteName = "WeikiTests-\(UUID().uuidString)"
+struct ShortcutActionsTests {
+    private let testDefaults = TestDefaults()
     private let service = RecordingPowerAssertions()
     private let controller: AwakeController
-    private let keynote = WatchedApp(processIdentifier: 502, name: "Keynote", bundleIdentifier: "com.apple.iWork.Keynote")
 
     init() {
         controller = AwakeController(
             service: service,
-            defaults: UserDefaults(suiteName: suiteName)!,
+            defaults: testDefaults.defaults,
             appWatcher: FakeAppQuitWatcher(),
             powerSource: FakePowerSource()
         )
-    }
-
-    deinit {
-        UserDefaults.standard.removePersistentDomain(forName: suiteName)
     }
 
     // MARK: - Keep Mac Awake
@@ -80,18 +75,30 @@ import Testing
 
     // MARK: - Keep Mac Awake Until App Quits
 
-    @Test func aRunningAppIsWatched() throws {
-        try ShortcutActions.keepAwake(until: keynote, named: "Keynote", on: controller)
+    private let now = Date()
 
-        #expect(controller.state == .on(until: .appQuits(keynote), paused: false))
+    /// A shortcut names an app by bundle identifier. Any running copy counts, with or without a
+    /// Dock icon, and the one launched last wins.
+    @Test func watchesTheNewestRunningCopyOfTheApp() throws {
+        let runningApps = [
+            TestRunningApp(processIdentifier: 30, localizedName: "Keynote", bundleIdentifier: "com.apple.iWork.Keynote", launchDate: now - 60),
+            TestRunningApp(processIdentifier: 31, localizedName: "Keynote", bundleIdentifier: "com.apple.iWork.Keynote", activationPolicy: .accessory, launchDate: now),
+            TestRunningApp(processIdentifier: 32, localizedName: "Safari", bundleIdentifier: "com.apple.Safari", launchDate: now + 60),
+        ]
+
+        try ShortcutActions.keepAwake(untilQuit: "com.apple.iWork.Keynote", named: "Keynote", among: runningApps, on: controller)
+
+        let newest = WatchedApp(processIdentifier: 31, name: "Keynote", bundleIdentifier: "com.apple.iWork.Keynote")
+        #expect(controller.state == .on(until: .appQuits(newest), paused: false))
     }
 
     @Test func anAppThatIsntRunningFailsByNameAndChangesNothing() {
+        let safari = TestRunningApp(processIdentifier: 32, localizedName: "Safari", bundleIdentifier: "com.apple.Safari")
         controller.start(.oneHour)
         let session = controller.state
 
         #expect(throws: ShortcutError.appNotRunning("Keynote")) {
-            try ShortcutActions.keepAwake(until: nil, named: "Keynote", on: controller)
+            try ShortcutActions.keepAwake(untilQuit: "com.apple.iWork.Keynote", named: "Keynote", among: [safari], on: controller)
         }
         #expect(controller.state == session)
     }

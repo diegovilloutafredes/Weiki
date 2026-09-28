@@ -27,9 +27,9 @@ Facts established before writing this design (App Intents documentation):
 ### 1. Thin intents over tested functions
 `ShortcutActions` holds what each action does:
 - `keepAwake(forSeconds:on:)` checks the duration first: nil means `.indefinitely`, the range is 60 seconds to 24 hours, the three presets match exactly, and anything else is `.custom`.
-- `keepAwake(until:named:on:)` fails with the app's name when it gets no running copy.
+- `keepAwake(untilQuit:named:among:on:)` finds the running copy of the app with that bundle identifier (Decision 4), and fails with the app's name when there is none.
 
-Both then start the session and fail with `.couldNotStart` if no session is on afterwards: macOS refused the hold, or the app quit meanwhile. This way a shortcut never reports a session that isn't there, and an automation can't carry on while the Mac sleeps. A paused session counts as on. Because the input is checked first, a failed action leaves the session as it was.
+Both then start the session and fail with `.couldNotStart` when `start` reports that no session is on afterwards: macOS refused the hold, or the app quit meanwhile. This way a shortcut never reports a session that isn't there, and an automation can't carry on while the Mac sleeps. A paused session counts as on. Because the input is checked first, a failed action leaves the session as it was.
 
 Each intent reads the controller through `@Dependency`, calls one of these (or `stop()`), and answers with the status line. "Is Weiki Keeping the Mac Awake?" returns `state.isHolding`. The unit tests call `ShortcutActions` with a controller built on fakes. They never go through `@Dependency`, because the test host is Weiki itself and has already registered the real controller.
 - *Alternative:* the logic inside `perform()`. Rejected, because it can't be tested without the App Intents runtime.
@@ -44,7 +44,7 @@ They use the default mode: no `openAppWhenRun` and no `supportedModes`. The syst
 `RunningAppEntity` uses the bundle identifier as its ID, so a saved shortcut finds the app again in a later launch. `WatchedApp` carries the bundle identifier for this.
 - `suggestedEntities()` lists the running apps with a Dock icon, once per bundle identifier, as the submenu does.
 - `entities(for:)` always resolves an ID. The name comes from the newest running copy, otherwise from the installed app's file name without ".app", otherwise the ID itself. It doesn't use `FileManager.displayName`, which would read "Keynote.app" when Finder shows extensions.
-- When the action runs, `RunningApps.newestInstance(of:among:)` finds the running copy launched last, with or without a Dock icon. That covers an app that hides its Dock icon, and an automation that fires as the app opens. If there is none, the action fails with "Keynote isn't running."
+- When the action runs, `ShortcutActions.newestInstance(of:among:)` finds the running copy launched last, with or without a Dock icon. That covers an app that hides its Dock icon, and an automation that fires as the app opens. If there is none, the action fails with "Keynote isn't running."
 
 ### 5. Errors and results
 - **Errors:** `ShortcutError` conforms to `CustomLocalizedStringResourceConvertible`, so Shortcuts shows its message:

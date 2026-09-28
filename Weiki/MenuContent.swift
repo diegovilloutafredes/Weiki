@@ -5,8 +5,8 @@ import SwiftUI
 struct MenuContent: View {
     @Bindable var controller: AwakeController
     let today: Today
-    let runningApps: RunningApps
-    let sleepBlockers: SleepBlockers
+    let runningApps: MenuOpenReading<[WatchedApp]>
+    let sleepBlockers: MenuOpenReading<[SleepBlocker]>
     let notifications: EndNotifications
     let loginItem: LoginItem
     @Environment(\.openWindow) private var openWindow
@@ -17,9 +17,9 @@ struct MenuContent: View {
         if controller.state != .off {
             Button("Turn Off") { controller.stop() }
         }
-        if !sleepBlockers.list.isEmpty {
+        if !sleepBlockers.value.isEmpty {
             Section("Also Keeping the Mac Awake") {
-                ForEach(sleepBlockers.list) { blocker in
+                ForEach(sleepBlockers.value) { blocker in
                     if blocker.keepsDisplayOn {
                         Text("\(blocker.name) — keeps the display on")
                     } else {
@@ -39,10 +39,10 @@ struct MenuContent: View {
                 set: { _ in openCustomDuration() }
             ))
             Menu("Until an App Quits") {
-                if runningApps.apps.isEmpty {
+                if runningApps.value.isEmpty {
                     Text("No Apps Running")
                 } else {
-                    ForEach(runningApps.apps) { app in
+                    ForEach(runningApps.value) { app in
                         Toggle(app.name, isOn: isActive(.untilQuit(app)))
                     }
                 }

@@ -1,5 +1,4 @@
 import AppKit
-import Observation
 
 /// What Weiki reads from a running app; `NSRunningApplication` provides it.
 protocol RunningAppInfo {
@@ -20,40 +19,19 @@ extension WatchedApp {
     }
 }
 
-/// The running apps that appear in the Dock, for the "Until an App Quits" submenu.
-///
-/// It refreshes each time a menu opens: a `.menu`-style menu only re-renders when observed
-/// state changes, and an app can show or hide its Dock icon while it runs, which no launch or
-/// quit notification reports. Weiki is a menu bar agent, so it's never in the list.
-@Observable
-final class RunningApps {
-    private(set) var apps: [WatchedApp] = []
-
-    init() {
-        refresh()
-        refreshWhenAMenuOpens { [weak self] in self?.refresh() }
+/// The running apps that appear in the Dock, for the "Until an App Quits" submenu and the apps
+/// Shortcuts suggests. Weiki is a menu bar agent, so it's never among them.
+enum RunningApps {
+    /// The apps with a Dock icon right now.
+    static func dockApps() -> [WatchedApp] {
+        dockApps(from: NSWorkspace.shared.runningApplications)
     }
 
-    /// Writes only a changed list, so an unchanged one doesn't re-render the menu.
-    private func refresh() {
-        let apps = Self.dockApps(from: NSWorkspace.shared.runningApplications)
-        if apps != self.apps { self.apps = apps }
-    }
-
-    /// The apps with a Dock icon, sorted by name the way Finder sorts.
+    /// The apps with a Dock icon among `runningApps`, sorted by name the way Finder sorts.
     static func dockApps(from runningApps: [some RunningAppInfo]) -> [WatchedApp] {
         runningApps
             .filter { $0.activationPolicy == .regular }
             .compactMap { WatchedApp($0) }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-    }
-
-    /// The running copy of the app with `bundleIdentifier` that was launched last, with or
-    /// without a Dock icon, or nil when none runs. This is how a shortcut finds the app it names.
-    static func newestInstance(of bundleIdentifier: String, among runningApps: [some RunningAppInfo]) -> WatchedApp? {
-        runningApps
-            .filter { $0.bundleIdentifier == bundleIdentifier }
-            .max { ($0.launchDate ?? .distantPast) < ($1.launchDate ?? .distantPast) }
-            .flatMap { WatchedApp($0) }
+            .sortedLikeFinder(by: \.name)
     }
 }

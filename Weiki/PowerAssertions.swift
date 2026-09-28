@@ -49,7 +49,8 @@ enum AssertionEffect {
 /// What one process's assertions keep awake, and the process name the system recorded.
 struct ProcessAssertions: Equatable {
     let processName: String?
-    let effects: [AssertionEffect]
+    /// Whether one of them keeps the display on; otherwise they keep only the Mac awake.
+    let keepsDisplayOn: Bool
 }
 
 extension SystemPowerAssertions {
@@ -70,7 +71,7 @@ extension SystemPowerAssertions {
             // Each assertion carries its process's name under this key, which IOPMLib.h doesn't
             // declare; it's what `pmset -g assertions` shows, even for processes owned by root.
             let processName = assertions.first?["Process Name"] as? String
-            result[process.int32Value] = ProcessAssertions(processName: processName, effects: effects)
+            result[process.int32Value] = ProcessAssertions(processName: processName, keepsDisplayOn: effects.contains(.keepsDisplayOn))
         }
         return result
     }

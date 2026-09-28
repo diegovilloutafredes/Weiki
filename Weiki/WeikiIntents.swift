@@ -28,7 +28,7 @@ struct KeepMacAwakeIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         try ShortcutActions.keepAwake(forSeconds: duration?.converted(to: .seconds).value, on: controller)
-        return .result(dialog: "\(controller.state.statusLine(now: .now))")
+        return .result(dialog: controller.statusDialog)
     }
 }
 
@@ -50,9 +50,8 @@ struct KeepMacAwakeUntilAppQuitsIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let runningCopy = RunningApps.newestInstance(of: app.id, among: NSWorkspace.shared.runningApplications)
-        try ShortcutActions.keepAwake(until: runningCopy, named: app.name, on: controller)
-        return .result(dialog: "\(controller.state.statusLine(now: .now))")
+        try ShortcutActions.keepAwake(untilQuit: app.id, named: app.name, among: NSWorkspace.shared.runningApplications, on: controller)
+        return .result(dialog: controller.statusDialog)
     }
 }
 
@@ -66,7 +65,7 @@ struct TurnOffWeikiIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         controller.stop()
-        return .result(dialog: "\(controller.state.statusLine(now: .now))")
+        return .result(dialog: controller.statusDialog)
     }
 }
 
@@ -81,7 +80,7 @@ struct IsWeikiKeepingTheMacAwakeIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<Bool> & ProvidesDialog {
-        .result(value: controller.state.isHolding, dialog: "\(controller.state.statusLine(now: .now))")
+        .result(value: controller.state.isHolding, dialog: controller.statusDialog)
     }
 }
 
@@ -104,7 +103,7 @@ struct RunningAppQuery: EntityQuery {
     @MainActor
     func suggestedEntities() async throws -> [RunningAppEntity] {
         var suggested = Set<String>()
-        return RunningApps.dockApps(from: NSWorkspace.shared.runningApplications).compactMap { app in
+        return RunningApps.dockApps().compactMap { app in
             guard let id = app.bundleIdentifier, suggested.insert(id).inserted else { return nil }
             return RunningAppEntity(id: id, name: app.name)
         }
@@ -116,11 +115,18 @@ struct RunningAppQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [RunningAppEntity] {
         let runningApps = NSWorkspace.shared.runningApplications
         return identifiers.map { id in
-            let name = RunningApps.newestInstance(of: id, among: runningApps)?.name
+            let name = ShortcutActions.newestInstance(of: id, among: runningApps)?.name
                 ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.deletingPathExtension().lastPathComponent
                 ?? id
             return RunningAppEntity(id: id, name: name)
         }
+    }
+}
+
+private extension AwakeController {
+    /// What every action answers with: the status line, as the menu shows it.
+    var statusDialog: IntentDialog {
+        "\(state.statusLine(now: .now))"
     }
 }
 

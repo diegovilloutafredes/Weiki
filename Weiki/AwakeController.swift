@@ -80,12 +80,18 @@ final class AwakeController {
         powerSource.observeChanges { [weak self] in self?.pauseOrResume() }
     }
 
-    /// Starts a session for `option`, replacing any active one.
-    func start(_ option: DurationOption) {
+    /// Starts a session for `option`, replacing any active one. Returns whether a session is on
+    /// afterwards, holding or paused: false when the chosen app isn't running, or macOS refused
+    /// the hold, and in both cases the previous session is over too.
+    @discardableResult
+    func start(_ option: DurationOption) -> Bool {
+        guard watchForTheAppToQuit(in: option) else {
+            stop()
+            return false
+        }
         // Set first: if the hold is refused, `hold` turns off, which clears it again.
         activeOption = option
-        hold(until: option.end(startingAt: now()))
-        watchForTheAppToQuit()
+        return hold(until: option.end(startingAt: now()))
     }
 
     /// Ends the session and releases its hold.
@@ -101,31 +107,35 @@ final class AwakeController {
 
     /// Holds the Mac awake in the current mode until `end` or, while the session must pause,
     /// holds nothing and keeps the session. A new hold is acquired before the previous one is
-    /// released, so there is never a gap.
-    private func hold(until end: SessionEnd) {
-        let remaining = end.endDate.map { $0.timeIntervalSince(now()) }
-        if let endDate = end.endDate, let remaining, remaining <= 0 { return timerRanOut(at: endDate) }
+    /// released, so there is never a gap. Returns whether the session is on afterwards.
+    @discardableResult
+    private func hold(until end: SessionEnd) -> Bool {
+        let remaining = end.endDate?.timeIntervalSince(now())
+        if let endDate = end.endDate, let remaining, remaining <= 0 {
+            timerRanOut(at: endDate)
+            return false
+        }
         let paused = mustPause
         if paused {
             releaseHold()
         } else {
-            do {
-                let newID = try service.acquire(
-                    keepsDisplayOn: keepsDisplayOn,
-                    // Whole seconds, rounded up so a fraction of a second never becomes 0 (no timeout).
-                    timeout: remaining?.rounded(.up) ?? 0,
-                    details: holdDetails(until: end)
-                )
-                releaseHold()
-                holdID = newID
-            } catch {
+            guard let newID = try? service.acquire(
+                keepsDisplayOn: keepsDisplayOn,
+                // Whole seconds, rounded up so a fraction of a second never becomes 0 (no timeout).
+                timeout: remaining?.rounded(.up) ?? 0,
+                details: holdDetails(until: end)
+            ) else {
                 // Releases the previous hold too: Weiki never shows a session it isn't holding.
-                return stop()
+                stop()
+                return false
             }
+            releaseHold()
+            holdID = newID
         }
         state = .on(until: end, paused: paused)
         minutesLeft = remaining.map { Self.shownMinutes(remaining: $0) }
         scheduleEnd(at: end.endDate)
+        return true
     }
 
     /// Ends a timed session whose end has passed, and reports it.
@@ -151,10 +161,14 @@ final class AwakeController {
         hold(until: end)
     }
 
-    /// Watches the app the session waits for, if any, and otherwise stops watching.
-    private func watchForTheAppToQuit() {
-        guard case .on(until: .appQuits(let app), _) = state else { return appWatcher.stopWatching() }
-        appWatcher.watch(app) { [weak self] in self?.appDidQuit(app) }
+    /// Watches the app `option` waits for, if any, and otherwise stops watching. False when that
+    /// app isn't running, so no hold is ever taken for it.
+    private func watchForTheAppToQuit(in option: DurationOption) -> Bool {
+        guard case .untilQuit(let app) = option else {
+            appWatcher.stopWatching()
+            return true
+        }
+        return appWatcher.watch(app) { [weak self] in self?.appDidQuit(app) }
     }
 
     /// Ends the session if it still waits for `app`. A late report, for an app the session no
@@ -167,11 +181,12 @@ final class AwakeController {
     /// What `pmset -g assertions` shows for the hold: the mode and when it ends.
     private func holdDetails(until end: SessionEnd) -> String {
         let mode = keepsDisplayOn ? "Display kept on" : "Display allowed to sleep"
-        return switch end {
-        case .never: "\(mode), indefinitely"
-        case .date(let endDate): "\(mode), until \(endDate.endTimeDescription(now: now()))"
-        case .appQuits(let app): "\(mode), until \(app.name) quits"
+        let ending = switch end {
+        case .never: "indefinitely"
+        case .date(let endDate): "until \(endDate.endTimeDescription(now: now()))"
+        case .appQuits(let app): "until \(app.name) quits"
         }
+        return "\(mode), \(ending)"
     }
 
     /// Counts `minutesLeft` down and turns the session off once `endDate` passes. It wakes each

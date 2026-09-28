@@ -35,8 +35,10 @@ extension CustomDurationView {
         } else {
             minutes = nil
         }
-        guard let minutes, (1...24 * 60).contains(minutes) else { return nil }
-        return TimeInterval(minutes * 60)
+        guard let minutes else { return nil }
+        // In TimeInterval, where a very long number can't overflow.
+        let seconds = TimeInterval(minutes) * 60
+        return DurationOption.customRange.contains(seconds) ? seconds : nil
     }
 
     /// Hours plus minutes, where the minutes must be under 60. Hours above 24 are

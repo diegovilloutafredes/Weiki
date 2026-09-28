@@ -9,14 +9,15 @@ struct SystemAppQuitWatcherTests {
         var isSet = false
     }
 
-    /// Reported before `watch` returns, so a session never starts for an app that's gone.
-    @Test func anAppThatIsNotRunningIsReportedAtOnce() {
+    /// `watch` refuses an app that isn't running, so a session never starts for it.
+    @Test func anAppThatIsNotRunningIsRefused() {
         let watcher = SystemAppQuitWatcher()
         let quit = QuitFlag()
 
-        watcher.watch(WatchedApp(processIdentifier: -1, name: "Gone")) { quit.isSet = true }
+        let watching = watcher.watch(WatchedApp(processIdentifier: -1, name: "Gone")) { quit.isSet = true }
 
-        #expect(quit.isSet)
+        #expect(watching == false)
+        #expect(quit.isSet == false)
     }
 
     /// Weiki itself hosts the tests, so it is running: watching it never reports a quit.
@@ -25,9 +26,10 @@ struct SystemAppQuitWatcherTests {
         let quit = QuitFlag()
         let weiki = WatchedApp(processIdentifier: NSRunningApplication.current.processIdentifier, name: "Weiki")
 
-        watcher.watch(weiki) { quit.isSet = true }
+        let watching = watcher.watch(weiki) { quit.isSet = true }
         try await Task.sleep(for: .milliseconds(200))
 
+        #expect(watching)
         #expect(quit.isSet == false)
         watcher.stopWatching()
     }

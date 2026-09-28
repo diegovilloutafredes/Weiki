@@ -8,9 +8,8 @@ final class TestClock {
     var now = Date(timeIntervalSinceReferenceDate: 780_000_000)
 }
 
-@Suite final class AwakeControllerTests {
-    private let suiteName = "WeikiTests-\(UUID().uuidString)"
-    private let defaults: UserDefaults
+struct AwakeControllerTests {
+    private let testDefaults = TestDefaults()
     private let service = RecordingPowerAssertions()
     private let clock = TestClock()
     private let appWatcher = FakeAppQuitWatcher()
@@ -18,14 +17,6 @@ final class TestClock {
     private let timerEnds = TimerEndRecorder()
     private let xcode = WatchedApp(processIdentifier: 501, name: "Xcode")
     private let keynote = WatchedApp(processIdentifier: 502, name: "Keynote")
-
-    init() {
-        defaults = UserDefaults(suiteName: suiteName)!
-    }
-
-    deinit {
-        UserDefaults.standard.removePersistentDomain(forName: suiteName)
-    }
 
     /// A controller with fakes for every system service, reading the test clock.
     private func makeController() -> AwakeController {
@@ -40,7 +31,7 @@ final class TestClock {
     ) -> AwakeController {
         AwakeController(
             service: service,
-            defaults: defaults,
+            defaults: testDefaults.defaults,
             now: now,
             sleep: sleep,
             appWatcher: appWatcher,
@@ -160,8 +151,11 @@ final class TestClock {
         #expect(service.calls.isEmpty)
     }
 
+    /// The end can pass before the end loop wakes, as right after the Mac wakes. A mode change
+    /// then ends the session, and that's still the timer running out.
     @Test func modeChangeAfterTheEndTimeTurnsOffInsteadOfHoldingAgain() {
         let controller = makeController()
+        let end = clock.now.addingTimeInterval(60)
         controller.start(.custom(60))
         clock.now += 120
 
@@ -169,6 +163,7 @@ final class TestClock {
 
         #expect(controller.state == .off)
         #expect(service.calls == [.acquire(keepsDisplayOn: true, timeout: 60), .release(1)])
+        #expect(timerEnds.dates == [end])
     }
 
     // MARK: - Refused holds
@@ -269,6 +264,7 @@ final class TestClock {
                 try await Task.sleep(for: .milliseconds(10))
             }
         )
+        let end = clock.now.addingTimeInterval(3600)
         controller.start(.custom(3600))
         try #require(await waitUntil { probe.sleeps.count >= 2 })
         #expect(probe.sleeps.allSatisfy { $0 == .seconds(60) })
@@ -278,6 +274,7 @@ final class TestClock {
         let ended = await waitUntil { controller.state == .off }
         #expect(ended)
         #expect(service.heldIDs.isEmpty)
+        #expect(timerEnds.dates == [end])
     }
 
     // MARK: - Active option
@@ -402,13 +399,29 @@ final class TestClock {
 
     @Test func anAppThatHasAlreadyQuitStartsNoSession() {
         let controller = makeController()
+        controller.start(.oneHour)
         appWatcher.quitApps = [xcode]
 
-        controller.start(.untilQuit(xcode))
+        let started = controller.start(.untilQuit(xcode))
 
+        #expect(started == false)
         #expect(controller.state == .off)
         #expect(controller.activeOption == nil)
-        #expect(service.heldIDs.isEmpty)
+        #expect(service.calls == [.acquire(keepsDisplayOn: true, timeout: 3600), .release(1)])
+    }
+
+    @Test func startSaysWhetherASessionIsOn() {
+        let controller = makeController()
+        #expect(controller.start(.oneHour))
+
+        controller.onlyOnACPower = true
+        power.isOnACPower = false
+        #expect(controller.start(.indefinitely), "a paused session is on")
+
+        power.isOnACPower = true
+        service.refusesHolds = true
+        #expect(controller.start(.twoHours) == false)
+        #expect(controller.state == .off)
     }
 
     @Test func choosingAnotherAppWatchesItInstead() {
@@ -613,55 +626,12 @@ final class TestClock {
         let ended = await waitUntil { controller.state == .off }
         #expect(ended)
         #expect(service.calls.isEmpty)
+        #expect(timerEnds.dates.count == 1)
     }
 
     // MARK: - Timer end
 
-    @Test func aTimedSessionThatRunsOutReportsItsEndOnce() async throws {
-        let probe = LoopProbe()
-        let controller = makeController(
-            now: { [clock] in clock.now },
-            sleep: { [probe] duration in
-                probe.sleeps.append(duration)
-                try await Task.sleep(for: .milliseconds(10))
-            }
-        )
-        let end = clock.now.addingTimeInterval(3600)
-        controller.start(.custom(3600))
-        try #require(await waitUntil { !probe.sleeps.isEmpty })
-
-        // The Mac slept past the end.
-        clock.now += 7200
-
-        #expect(await waitUntil { controller.state == .off })
-        #expect(timerEnds.dates == [end])
-    }
-
-    @Test func aPausedSessionThatRunsOutReportsItsEnd() async {
-        let controller = makeController(now: { .now })
-        controller.onlyOnACPower = true
-        power.isOnACPower = false
-
-        controller.start(.custom(0.2))
-
-        #expect(await waitUntil { controller.state == .off })
-        #expect(timerEnds.dates.count == 1)
-    }
-
-    /// The end can pass before the end loop wakes, as right after the Mac wakes; a mode
-    /// change then ends the session, and that's still the timer running out.
-    @Test func anEndFoundOnAModeChangeIsReported() {
-        let controller = makeController()
-        let end = clock.now.addingTimeInterval(60)
-        controller.start(.custom(60))
-        clock.now += 120
-
-        controller.keepsDisplayOn = false
-
-        #expect(controller.state == .off)
-        #expect(timerEnds.dates == [end])
-    }
-
+    /// Only a timer running out is reported, which is what "Notify When Time's Up" posts for.
     @Test func endingAnyOtherWayReportsNothing() {
         let controller = makeController()
 

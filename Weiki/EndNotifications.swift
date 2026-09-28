@@ -36,10 +36,13 @@ final class EndNotifications {
         self.defaults = defaults
     }
 
-    /// Reads the saved choice and macOS's permission again.
+    /// Reads the saved choice and, when it's on, macOS's permission again.
     func refresh() async {
-        let permission = await service.permission()
-        isEnabled = defaults.bool(forKey: Self.wantsNotificationsKey) && permission == .allowed
+        guard defaults.bool(forKey: Self.wantsNotificationsKey) else {
+            isEnabled = false
+            return
+        }
+        isEnabled = await service.permission() == .allowed
     }
 
     /// Turns the setting on or off. Turning it on asks for permission the first time; after the

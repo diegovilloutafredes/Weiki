@@ -71,14 +71,42 @@ struct SystemPowerAssertionsTests {
         defer { service.release(id) }
 
         let own = SystemPowerAssertions.assertionsByProcess()[getpid()]
-        #expect(own == ProcessAssertions(processName: ProcessInfo.processInfo.processName, effects: [.keepsDisplayOn]))
+        #expect(own == ProcessAssertions(processName: ProcessInfo.processInfo.processName, keepsDisplayOn: true))
+    }
+
+    /// A process whose holds keep both the display and the Mac awake reads as keeping the display on.
+    @Test func assertionsByProcessReadsDisplayOverSystem() throws {
+        let systemHold = try service.acquire(keepsDisplayOn: false, timeout: 0, details: "Display allowed to sleep, indefinitely")
+        defer { service.release(systemHold) }
+        #expect(SystemPowerAssertions.assertionsByProcess()[getpid()]?.keepsDisplayOn == false)
+
+        let displayHold = try service.acquire(keepsDisplayOn: true, timeout: 0, details: "Display kept on, indefinitely")
+        defer { service.release(displayHold) }
+
+        #expect(SystemPowerAssertions.assertionsByProcess()[getpid()]?.keepsDisplayOn == true)
     }
 
     @Test func assertionsByProcessLeavesOutReleasedHolds() throws {
         let id = try service.acquire(keepsDisplayOn: false, timeout: 0, details: "Display allowed to sleep, indefinitely")
-        #expect(SystemPowerAssertions.assertionsByProcess()[getpid()]?.effects == [.keepsMacAwake])
+        #expect(SystemPowerAssertions.assertionsByProcess()[getpid()] != nil)
 
         service.release(id)
+
+        #expect(SystemPowerAssertions.assertionsByProcess()[getpid()] == nil)
+    }
+
+    /// A process whose assertions keep neither the display nor the Mac awake isn't listed,
+    /// as with the window server's "user is active".
+    @Test func assertionsByProcessLeavesOutProcessesThatKeepNothingAwake() throws {
+        var id = IOPMAssertionID(0)
+        try #require(IOPMAssertionCreateWithName(
+            kIOPMAssertPreventDiskIdle as CFString,
+            IOPMAssertionLevel(kIOPMAssertionLevelOn),
+            "WeikiTests" as CFString,
+            &id
+        ) == kIOReturnSuccess)
+        defer { IOPMAssertionRelease(id) }
+        try #require(heldAssertions(named: "WeikiTests").count == 1)
 
         #expect(SystemPowerAssertions.assertionsByProcess()[getpid()] == nil)
     }

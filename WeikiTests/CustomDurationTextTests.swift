@@ -23,7 +23,7 @@ struct CustomDurationTextTests {
         #expect(CustomDurationView.duration(from: text) == TimeInterval(minutes * 60))
     }
 
-    @Test(arguments: ["", "abc", "0", "0m", "25h", "24h1m", "1h60", "1:60", "1:5", "-5", "1.5h", "h", "99999999999999999h"])
+    @Test(arguments: ["", "abc", "0", "0m", "25h", "24h1m", "1h60", "1:60", "1:5", "-5", "1.5h", "h", "99999999999999999h", "999999999999999999"])
     func rejectsText(_ text: String) {
         #expect(CustomDurationView.duration(from: text) == nil)
     }
