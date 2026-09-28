@@ -24,15 +24,15 @@ Facts established before writing this design (App Intents documentation):
 
 ## Decisions
 
-### 1. Thin intents over one set of actions
-`ShortcutActions`, an extension on `AwakeController`, holds the logic:
-- `keepAwake(for seconds: TimeInterval?)` validates the duration and maps it to a `DurationOption`: nil means `.indefinitely`, the three presets match exactly, and anything else is `.custom`. The intent converts its `Measurement<UnitDuration>` to seconds.
-- `keepAwake(untilQuit bundleID:)` finds a running app by bundle identifier or throws.
-- `turnOff()`.
-- `isKeepingAwake`, which is true only for `.on(_, paused: false)`.
+### 1. Thin intents over pure decisions
+`ShortcutActions` holds the decisions as pure functions that return the `DurationOption` to start, or throw a typed `ShortcutError`:
+- `option(forSeconds:)`: nil means `.indefinitely`, the range is 60 seconds to 24 hours, the three presets match exactly, and anything else is `.custom`.
+- `option(untilQuit:named:among:)`: finds a running app by bundle identifier, or throws `.appNotRunning(name)`.
 
-Each intent reads the controller through `@Dependency` and calls one of these in a `@MainActor perform()`. Unit tests call `ShortcutActions` directly with a test controller, never through `@Dependency`, because the test host is Weiki itself and has already registered the real controller.
-- *Alternative:* logic inside `perform()`. Rejected, because it can't be tested without the App Intents runtime.
+Each intent reads the controller through `@Dependency`, calls `controller.start(try …)` (or `stop()`), and answers with the status line. "Is Weiki Keeping the Mac Awake?" returns `state.isHolding`. Unit tests call `ShortcutActions` directly and never go through `@Dependency`, because the test host is Weiki itself and has already registered the real controller. `stop()` and `isHolding` are covered by the controller tests.
+
+`WatchedApp` gains an optional `bundleIdentifier`, which `RunningApps.dockApps(from:)` fills in, so a shortcut can find an app again in a later launch.
+- *Alternative:* an extension on `AwakeController` with `keepAwake(for:)` and so on. Rejected: it would mix the input rules with the session, and each test would need a controller.
 
 ### 2. Sharing the controller
 `WeikiApp.init` creates the controller and `RunningApps`, stores them in its `@State` (through `State(initialValue:)`), and registers the same instances with `AppDependencyManager`. There is one controller, so the menu and the actions always agree.

@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 
 @main
@@ -11,8 +12,11 @@ struct WeikiApp: App {
 
     init() {
         let notifications = EndNotifications()
+        let controller = AwakeController(onTimerEnd: { notifications.timerRanOut(at: $0) })
         _notifications = State(initialValue: notifications)
-        _controller = State(initialValue: AwakeController(onTimerEnd: { notifications.timerRanOut(at: $0) }))
+        _controller = State(initialValue: controller)
+        // Shortcuts actions reach the same controller the menu shows.
+        AppDependencyManager.shared.add(dependency: controller)
         // Reading the permission never prompts.
         Task { await notifications.refresh() }
     }

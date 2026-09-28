@@ -16,6 +16,17 @@ Weiki is a small macOS menu bar app that does what `caffeinate` does, from a men
 - **Nothing left behind.** A session ends on time, even if the Mac slept past the end, and quitting Weiki releases its hold right away.
 - **Launch at Login.** Off until you turn it on in the menu; the checkmark always matches System Settings.
 
+## Shortcuts
+
+Weiki adds four actions to the Shortcuts app:
+
+- **Keep Mac Awake**, indefinitely or for a duration from 1 minute to 24 hours
+- **Keep Mac Awake Until App Quits**, for a running app
+- **Turn Off Weiki**
+- **Is Weiki Keeping the Mac Awake?**, which returns true or false
+
+A session started from Shortcuts works like one started from the menu. Siri and Spotlight know "Keep my Mac awake with Weiki", "Turn off Weiki", and "Is Weiki on?" without any setup. To use a keyboard shortcut, add one to a shortcut in the Shortcuts app. On macOS 26 and later, a Shortcuts automation can run these actions at a time of day, when an app opens, when a display connects, or when a Focus starts. For example: when Keynote opens, keep the Mac awake until Keynote quits.
+
 ## How it works
 
 Weiki creates IOKit power assertions directly, the same mechanism `caffeinate` uses. While a session is active, you can see its hold with:

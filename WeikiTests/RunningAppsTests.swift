@@ -6,6 +6,7 @@ struct RunningAppsTests {
     private struct App: RunningAppInfo {
         let processIdentifier: pid_t
         let localizedName: String?
+        var bundleIdentifier: String?
         let activationPolicy: NSApplication.ActivationPolicy
     }
 
@@ -13,8 +14,8 @@ struct RunningAppsTests {
     /// "Safari", unlike a plain string comparison).
     @Test func listsDockAppsByName() {
         let apps = RunningApps.dockApps(from: [
-            App(processIdentifier: 1, localizedName: "Xcode", activationPolicy: .regular),
-            App(processIdentifier: 2, localizedName: "iTerm2", activationPolicy: .regular),
+            App(processIdentifier: 1, localizedName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", activationPolicy: .regular),
+            App(processIdentifier: 2, localizedName: "iTerm2", bundleIdentifier: "com.googlecode.iterm2", activationPolicy: .regular),
             App(processIdentifier: 3, localizedName: "Bartender", activationPolicy: .accessory),
             App(processIdentifier: 4, localizedName: "Safari", activationPolicy: .regular),
             App(processIdentifier: 5, localizedName: "coreauthd", activationPolicy: .prohibited),
@@ -22,9 +23,9 @@ struct RunningAppsTests {
         ])
 
         #expect(apps == [
-            WatchedApp(processIdentifier: 2, name: "iTerm2"),
+            WatchedApp(processIdentifier: 2, name: "iTerm2", bundleIdentifier: "com.googlecode.iterm2"),
             WatchedApp(processIdentifier: 4, name: "Safari"),
-            WatchedApp(processIdentifier: 1, name: "Xcode"),
+            WatchedApp(processIdentifier: 1, name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode"),
         ])
     }
 

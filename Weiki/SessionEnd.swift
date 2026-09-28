@@ -19,6 +19,8 @@ enum SessionEnd: Hashable {
 struct WatchedApp: Hashable, Identifiable {
     let processIdentifier: pid_t
     let name: String
+    /// How a shortcut finds the app again in a later launch; nil for the rare app without one.
+    var bundleIdentifier: String?
 
     var id: pid_t { processIdentifier }
 }

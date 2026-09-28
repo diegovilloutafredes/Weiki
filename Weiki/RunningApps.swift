@@ -5,6 +5,7 @@ import Observation
 protocol RunningAppInfo {
     var processIdentifier: pid_t { get }
     var localizedName: String? { get }
+    var bundleIdentifier: String? { get }
     var activationPolicy: NSApplication.ActivationPolicy { get }
 }
 
@@ -35,7 +36,9 @@ final class RunningApps {
     static func dockApps(from runningApps: [some RunningAppInfo]) -> [WatchedApp] {
         runningApps
             .filter { $0.activationPolicy == .regular }
-            .compactMap { app in app.localizedName.map { WatchedApp(processIdentifier: app.processIdentifier, name: $0) } }
+            .compactMap { app in
+                app.localizedName.map { WatchedApp(processIdentifier: app.processIdentifier, name: $0, bundleIdentifier: app.bundleIdentifier) }
+            }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 }
