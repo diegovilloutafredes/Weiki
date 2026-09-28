@@ -14,10 +14,13 @@ if [ ! -d "$APP_SRC" ]; then
     exit 1
 fi
 
-# Quitting Weiki ends its session. Wait up to 5 s for it to exit, so `open`
-# launches the new app instead of reactivating the old one.
+# Quitting Weiki ends its session. Wait up to 5 s for it to exit and for Launch
+# Services to let it go: until then, `open` fails with error -600.
 pkill -x Weiki 2>/dev/null || true
-for _ in $(seq 50); do pgrep -xq Weiki || break; sleep 0.1; done
+for _ in $(seq 50); do
+    pgrep -xq Weiki || [ -n "$(lsappinfo find bundleid=com.weiki.app)" ] || break
+    sleep 0.1
+done
 
 # Delete, then copy: Launch Services caches an app that is replaced in place.
 rm -rf "$APP_DEST"

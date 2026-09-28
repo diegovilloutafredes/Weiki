@@ -101,8 +101,9 @@ tag:
 run: build
 	@echo "==> Installing and launching..."
 	@pkill -x Weiki 2>/dev/null || true
-	@# Wait (up to 5 s) for it to exit, so `open` can't hand off to the dying instance.
-	@for i in $$(seq 50); do pgrep -x Weiki >/dev/null || break; sleep 0.1; done
+	@# Wait (up to 5 s) for it to exit and for Launch Services to let it go: until
+	@# then, `open` fails with error -600.
+	@for i in $$(seq 50); do pgrep -xq Weiki || [ -n "$$(lsappinfo find bundleid=com.weiki.app)" ] || break; sleep 0.1; done
 	@rm -rf /Applications/$(APP)
 	@cp -R $(BUILD_DIR)/$(APP) /Applications/$(APP)
 	@open /Applications/$(APP)

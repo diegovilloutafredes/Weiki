@@ -32,12 +32,15 @@ if [ ! -d "$TMP_DIR/$APP_NAME" ]; then
     exit 1
 fi
 
-# Quitting Weiki ends its session. Wait up to 5 s for it to exit, so `open`
-# launches the new app instead of reactivating the old one.
+# Quitting Weiki ends its session. Wait up to 5 s for it to exit and for Launch
+# Services to let it go: until then, `open` fails with error -600.
 if pgrep -xq Weiki; then
     echo "==> Quitting Weiki..."
     pkill -x Weiki || true
-    for _ in $(seq 50); do pgrep -xq Weiki || break; sleep 0.1; done
+    for _ in $(seq 50); do
+        pgrep -xq Weiki || [ -n "$(lsappinfo find bundleid=com.weiki.app)" ] || break
+        sleep 0.1
+    done
 fi
 
 echo "==> Installing into /Applications..."
