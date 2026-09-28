@@ -18,7 +18,7 @@ The icon SHALL be a filled cup while a session holds the Mac awake, and an outli
 - **THEN** the icon becomes an outlined cup without the user opening the menu
 
 ### Requirement: Time left in the menu bar
-While a session is active, the menu bar SHALL show text next to the cup: "∞" for an indefinite session, the time left for a timed session, or the app's name for a session that waits for an app to quit. The time left SHALL be rounded up to the next whole minute and written in hours and minutes (for example "42m" or "1h 5m"). It SHALL count down as each minute passes, without the user opening the menu. An app's name longer than 10 characters SHALL be cut to its first 10 characters followed by "…". No text SHALL be shown while no session is active.
+While a session is active, the menu bar SHALL show text next to the cup: "∞" for an indefinite session, the time left for a timed session, or the app's name for a session that waits for an app to quit. The time left SHALL be rounded up to the next whole minute and written in hours and minutes (for example "42m" or "1h 5m"). It SHALL count down as each minute passes, without the user opening the menu. An app's name longer than 10 characters SHALL be cut to its first 10 characters, without a trailing space, followed by "…". No text SHALL be shown while no session is active.
 
 #### Scenario: Indefinite session
 - **WHEN** an indefinite session is active
@@ -40,6 +40,10 @@ While a session is active, the menu bar SHALL show text next to the cup: "∞" f
 #### Scenario: A long app name
 - **WHEN** a session is waiting for an app named "Visual Studio Code"
 - **THEN** the menu bar shows the filled cup followed by "Visual Stu…"
+
+#### Scenario: A long app name cut at a space
+- **WHEN** a session is waiting for an app named "Microsoft Word"
+- **THEN** the menu bar shows the filled cup followed by "Microsoft…"
 
 #### Scenario: No session
 - **WHEN** no session is active

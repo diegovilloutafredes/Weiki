@@ -15,8 +15,10 @@ final class SystemNotificationService: NotificationService {
     func permission() async -> NotificationPermission {
         switch await center.notificationSettings().authorizationStatus {
         case .notDetermined: .notDetermined
+        case .authorized, .provisional: .allowed
         case .denied: .denied
-        default: .allowed // .authorized, .provisional, .ephemeral
+        // Counted as denied, so the item never shows as on when it may not be.
+        @unknown default: .denied
         }
     }
 

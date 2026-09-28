@@ -12,20 +12,18 @@ extension NSRunningApplication: RunningAppInfo {}
 
 /// The running apps that appear in the Dock, for the "Until an App Quits" submenu.
 ///
-/// It follows apps launching and quitting, because a `.menu`-style menu only re-renders when
-/// observed state changes. Weiki is a menu bar agent, so it's never in the list.
+/// It refreshes each time a menu opens: a `.menu`-style menu only re-renders when observed
+/// state changes, and an app can show or hide its Dock icon while it runs, which no launch or
+/// quit notification reports. Weiki is a menu bar agent, so it's never in the list.
 @Observable
 final class RunningApps {
     private(set) var apps: [WatchedApp] = []
 
     init() {
         refresh()
-        let changes = [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification]
-        // Lives as long as the app, so the observers are never removed.
-        for change in changes {
-            _ = NSWorkspace.shared.notificationCenter.addObserver(forName: change, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.refresh() }
-            }
+        // Lives as long as the app, so the observer is never removed.
+        _ = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
         }
     }
 

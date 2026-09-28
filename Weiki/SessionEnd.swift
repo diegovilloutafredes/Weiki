@@ -2,7 +2,7 @@ import Foundation
 
 /// When a session ends.
 enum SessionEnd: Hashable {
-    /// Only Turn Off, or quitting Weiki, ends it.
+    /// No end of its own: it lasts until it's turned off or replaced, or Weiki quits.
     case never
     /// A timed session ends at this date.
     case date(Date)

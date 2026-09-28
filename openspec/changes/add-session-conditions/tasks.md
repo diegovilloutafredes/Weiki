@@ -79,4 +79,4 @@
   - the Custom window
 
   The battery and permission scenarios are the manual tasks 4.3, 5.2, and 5.3.
-- [ ] 6.2 Review the Swift sources and fix the confirmed findings. Verify that `make test` and `make build` pass with no warnings.
+- [x] 6.2 Review the Swift sources and fix the confirmed findings. Verify that `make test` and `make build` pass with no warnings.

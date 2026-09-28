@@ -27,11 +27,22 @@ final class TestClock {
         UserDefaults.standard.removePersistentDomain(forName: suiteName)
     }
 
+    /// A controller with fakes for every system service, reading the test clock.
     private func makeController() -> AwakeController {
+        makeController(now: { [clock] in clock.now })
+    }
+
+    /// A controller with fakes for every system service. Tests that wait for a real end pass
+    /// `now: { .now }`, since the end loop's default `sleep` takes real time.
+    private func makeController(
+        now: @escaping () -> Date,
+        sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    ) -> AwakeController {
         AwakeController(
             service: service,
             defaults: defaults,
-            now: { [clock] in clock.now },
+            now: now,
+            sleep: sleep,
             appWatcher: appWatcher,
             powerSource: power,
             onTimerEnd: { [timerEnds] in timerEnds.dates.append($0) }
@@ -212,7 +223,7 @@ final class TestClock {
     // MARK: - Timed end
 
     @Test func timedSessionEndsOnItsOwn() async throws {
-        let controller = AwakeController(service: service, defaults: defaults)
+        let controller = makeController(now: { .now })
 
         controller.start(.custom(0.2))
         try #require(controller.state != .off)
@@ -225,7 +236,7 @@ final class TestClock {
     }
 
     @Test func replacingATimedSessionCancelsItsEnd() async throws {
-        let controller = AwakeController(service: service, defaults: defaults)
+        let controller = makeController(now: { .now })
         controller.start(.custom(0.1))
 
         controller.start(.indefinitely)
@@ -236,7 +247,7 @@ final class TestClock {
     }
 
     @Test func modeChangeKeepsTheSessionRunningUntilItsEnd() async throws {
-        let controller = AwakeController(service: service, defaults: defaults)
+        let controller = makeController(now: { .now })
         controller.start(.custom(0.5))
 
         controller.keepsDisplayOn = false
@@ -251,9 +262,7 @@ final class TestClock {
     /// and re-reads the clock, so a jump past the end turns the session off on the next tick.
     @Test func endLoopSleepsAtMostAMinuteAndRereadsTheClock() async throws {
         let probe = LoopProbe()
-        let controller = AwakeController(
-            service: service,
-            defaults: defaults,
+        let controller = makeController(
             now: { [clock] in clock.now },
             sleep: { [probe] duration in
                 probe.sleeps.append(duration)
@@ -344,9 +353,7 @@ final class TestClock {
     /// after 30 s shows 2, after another 60 s shows 1, and 60 s later the session ends.
     @Test func minutesLeftCountsDownAtEachMinute() async throws {
         let probe = LoopProbe()
-        let controller = AwakeController(
-            service: service,
-            defaults: defaults,
+        let controller = makeController(
             now: { [clock] in clock.now },
             sleep: { [clock, probe] duration in
                 probe.sleeps.append(duration)
@@ -433,18 +440,18 @@ final class TestClock {
         #expect(appWatcher.watched == nil)
     }
 
-    /// The system may deliver the quit after the session moved on; it must not end the new one.
+    /// The system may deliver a quit after the session moved on to another app; it must not
+    /// end the newer session.
     @Test func aLateQuitForAReplacedAppChangesNothing() throws {
         let controller = makeController()
         controller.start(.untilQuit(xcode))
-        let lateOnQuit = try #require(appWatcher.latestOnQuit)
-        controller.start(.oneHour)
-        let oneHourSession = controller.state
+        let lateXcodeQuit = try #require(appWatcher.latestOnQuit)
+        controller.start(.untilQuit(keynote))
 
-        lateOnQuit()
+        lateXcodeQuit()
 
-        #expect(controller.state == oneHourSession)
-        #expect(controller.activeOption == .oneHour)
+        #expect(controller.state == .on(until: .appQuits(keynote), paused: false))
+        #expect(controller.activeOption == .untilQuit(keynote))
         #expect(service.heldIDs == [2])
     }
 
@@ -596,7 +603,7 @@ final class TestClock {
     }
 
     @Test func aPausedTimedSessionStillEndsOnTime() async throws {
-        let controller = AwakeController(service: service, defaults: defaults, appWatcher: appWatcher, powerSource: power)
+        let controller = makeController(now: { .now })
         controller.onlyOnACPower = true
         power.isOnACPower = false
 
@@ -612,15 +619,12 @@ final class TestClock {
 
     @Test func aTimedSessionThatRunsOutReportsItsEndOnce() async throws {
         let probe = LoopProbe()
-        let controller = AwakeController(
-            service: service,
-            defaults: defaults,
+        let controller = makeController(
             now: { [clock] in clock.now },
             sleep: { [probe] duration in
                 probe.sleeps.append(duration)
                 try await Task.sleep(for: .milliseconds(10))
-            },
-            onTimerEnd: { [timerEnds] in timerEnds.dates.append($0) }
+            }
         )
         let end = clock.now.addingTimeInterval(3600)
         controller.start(.custom(3600))
@@ -634,12 +638,7 @@ final class TestClock {
     }
 
     @Test func aPausedSessionThatRunsOutReportsItsEnd() async {
-        let controller = AwakeController(
-            service: service,
-            defaults: defaults,
-            powerSource: power,
-            onTimerEnd: { [timerEnds] in timerEnds.dates.append($0) }
-        )
+        let controller = makeController(now: { .now })
         controller.onlyOnACPower = true
         power.isOnACPower = false
 

@@ -9,13 +9,14 @@ struct SystemAppQuitWatcherTests {
         var isSet = false
     }
 
-    @Test func anAppThatIsNotRunningCountsAsQuit() async {
+    /// Reported before `watch` returns, so a session never starts for an app that's gone.
+    @Test func anAppThatIsNotRunningIsReportedAtOnce() {
         let watcher = SystemAppQuitWatcher()
         let quit = QuitFlag()
 
         watcher.watch(WatchedApp(processIdentifier: -1, name: "Gone")) { quit.isSet = true }
 
-        #expect(await waitUntil { quit.isSet })
+        #expect(quit.isSet)
     }
 
     /// Weiki itself hosts the tests, so it is running: watching it never reports a quit.
