@@ -46,9 +46,9 @@
 
   Then implement `PowerSourceService`, `SystemPowerSource`, and the pausing in `hold` (design Decisions 4 and 5). Verify that `make test` passes.
 - [x] 4.2 Add the "Only on AC Power" item and the paused label and status line (design Decision 7). Verify with `make run` and `pmset -g assertions` on AC power that turning the setting on changes nothing while plugged in.
-- [ ] 4.3 By hand (needs a person with a laptop): with the setting on, unplug during a timed session and check that the cup is outlined, the status line reads "Paused on battery, until …", and `pmset -g assertions` lists no Weiki hold. Plug in again and check that one hold returns, with a timeout for the remaining time.
+- [x] 4.3 By hand (needs a person with a laptop): with the setting on, unplug during a timed session and check that the cup is outlined, the status line reads "Paused on battery, until …", and `pmset -g assertions` lists no Weiki hold. Plug in again and check that one hold returns, with a timeout for the remaining time.
 
-  Not done yet: it needs someone to unplug the Mac. On AC power, turning the setting on kept the same hold (checked with `pmset`), and a user process can't fake the power-source notification.
+  Checked on a MacBook with a 1-hour session ending at 00:05, reading `pmset` 2 seconds after each change. On battery, turning the setting on paused the session. Plugging in resumed it: one hold, timeout 3216 s (the time left), filled cup. Unplugging paused it again: outlined cup, "Paused on battery, until Mon, 00:05", no Weiki hold, and the minutes kept counting down. Plugging in once more brought one hold back, timeout 2419 s.
 - [x] 4.4 Add the power-source seam, the pausing rule, and `SystemPowerSource` as the second file that imports IOKit to the project notes. Verify that the text matches the code.
 
 ## 5. Notify When Time's Up
@@ -59,10 +59,12 @@
   - `EndNotifications`: off by default and persisted; checked only when on and allowed; the first choice asks permission, and a decline leaves it unchecked; a choice after declining opens System Settings through a fake opener and leaves it unchecked
 
   Then implement `NotificationService`, `SystemNotificationService` with its delegate, and `EndNotifications` (design Decision 6). Verify that `make test` passes and never shows a permission prompt.
-- [ ] 5.2 Add the "Notify When Time's Up" item and connect `onTimerEnd` in `WeikiApp`. Verify with `make run`: turning it on shows macOS's prompt, and a 1-minute Custom session then posts "Weiki is off" when it ends.
+- [x] 5.2 Add the "Notify When Time's Up" item and connect `onTimerEnd` in `WeikiApp`. Verify with `make run`: turning it on shows macOS's prompt, and a 1-minute Custom session then posts "Weiki is off" when it ends.
 
-  Done so far: the item and its wiring are in, and choosing it showed macOS's "“Weiki” Notifications" prompt (checked with a screenshot). Still to do: someone has to click Allow, then a 1-minute session should post the notification.
-- [ ] 5.3 By hand (needs a person): decline the prompt in a fresh setup, then choose the item again and check that System Settings opens at Weiki's notifications (or the Notifications page).
+  Choosing the item showed macOS's "“Weiki” Notifications" prompt (checked with a screenshot). Once notifications were allowed (see 5.3), choosing the item checked it and saved the choice. Two 1-minute Custom sessions each posted "Weiki is off", and the system log shows macOS presenting it as a banner, with no Focus suppression. With nothing touching Weiki, it posted about 4 seconds after the end: the system coalesces the end loop's timer. The hold itself was released on time by its IOKit timeout.
+- [x] 5.3 By hand (needs a person): decline the prompt in a fresh setup, then choose the item again and check that System Settings opens at Weiki's notifications (or the Notifications page).
+
+  Checked with notifications already declined for Weiki: choosing the item opened System Settings on Weiki's own page ("Allow notifications", switched off), and the item stayed unchecked. After switching notifications on there, choosing the item again checked it.
 
   The link itself works: `x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=com.weiki.app` opened System Settings on a "Weiki" page showing "Allow notifications" (macOS 27).
 - [x] 5.4 Add the notification seam, the delegate rule, and "timers only" to the project notes. Verify that the text matches the code.
