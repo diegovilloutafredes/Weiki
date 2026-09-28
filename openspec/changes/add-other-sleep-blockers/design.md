@@ -34,18 +34,22 @@ The model refreshes on `NSMenu.didBeginTrackingNotification`, which AppKit posts
 - *Rejected:* the private `com.apple.system.powermanagement.assertions` notification, because it isn't API.
 
 ### 2. What counts, as a pure function
-`SleepBlockers.list(from:name:excluding:)` takes the assertions by process ID, a function that names a process, and Weiki's process ID. It returns `[SleepBlocker]` (name, `keepsDisplayOn`):
-- **Display types:** `PreventUserIdleDisplaySleep`, and its old name `NoDisplaySleepAssertion`.
-- **System types:** `PreventUserIdleSystemSleep`, `NoIdleSleepAssertion`, `PreventSystemSleep`, and `NetworkClientActive` (which `IOPMLib.h` says "keeps the system awake while OS X serves active network clients").
-- **Ignored:** every other type (`Internal*`, `UserIsActive`, `BackgroundTask`, and so on), assertions whose level isn't on, Weiki's own process, and the process named `powerd`. `powerd` is the power manager itself, so its assertions are the system's bookkeeping.
+`SleepBlockers.list(from:appName:excluding:)` takes each process's `ProcessAssertions` (the name the system recorded, plus what its assertions keep awake), a function that gives an app's Dock name, and Weiki's process ID. It returns `[SleepBlocker]` (name, `keepsDisplayOn`):
+- **Naming:** a process goes by its app's name when it has one, and otherwise by its recorded process name.
+- **Ignored:** Weiki's own process, `powerd` (the power manager, whose assertions are the system's bookkeeping), and processes whose assertions keep nothing awake.
 - **Grouping:** processes are grouped by name, and display wins over system. The list is sorted with `localizedStandardCompare`.
 
-Tests feed it literal dictionaries.
+Tests feed it literal values.
 
-### 3. Reading and naming
-`SystemPowerAssertions.processAssertions()` wraps `IOPMCopyAssertionsByProcess` and returns `[pid_t: [ProcessAssertion]]` (type, name, whether it's on). It lives in `PowerAssertions.swift`, which stays the only code that imports `IOKit.pwr_mgt`. A serialized integration test creates a hold and finds it under its own process with the right type.
+### 3. Reading, and what each type means
+`SystemPowerAssertions.assertionsByProcess()` wraps `IOPMCopyAssertionsByProcess`. It keeps each process's assertions that are on (`AssertLevel` equals `kIOPMAssertionLevelOn`), turns each type into an `AssertionEffect` (`effect(ofType:)`), and drops processes with none left. `PowerAssertions.swift` stays the only code that imports `IOKit.pwr_mgt`, so the IOKit type names stay there:
+- **Display:** `PreventUserIdleDisplaySleep`, and its old name `NoDisplaySleepAssertion`.
+- **System:** `PreventUserIdleSystemSleep`, `NoIdleSleepAssertion`, `PreventSystemSleep`, and `NetworkClientActive` (which `IOPMLib.h` says "keeps the system awake while OS X serves active network clients").
+- **Everything else** (`Internal*`, `UserIsActive`, `BackgroundTask`, and so on) has no effect.
 
-A process's name is its app's `localizedName` when it has one (the Dock name), and otherwise `proc_name`.
+The process name comes from the assertion's `"Process Name"` key. `IOPMLib.h` doesn't declare that key, but every assertion carries it, and it's what `pmset -g assertions` prints. `proc_name` was tried first, but it returns nothing for root-owned processes such as `powerd` or `coreaudiod`.
+
+A serialized integration test creates a hold and finds it under its own process, with the right effect and the process's name.
 
 ### 4. Model and menu
 `SleepBlockers` is `@Observable`. `WeikiApp` owns it and passes it to `MenuContent`, which shows:

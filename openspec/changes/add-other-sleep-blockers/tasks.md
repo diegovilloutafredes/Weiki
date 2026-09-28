@@ -6,7 +6,7 @@
 
 ## 2. What counts
 
-- [ ] 2.1 Write the `SleepBlockers.list(from:name:excluding:)` tests first, with literal assertions:
+- [x] 2.1 Write the `SleepBlockers.list(from:appName:excluding:)` tests first, with literal assertions:
   - each counted type is listed (display and system)
   - ignored types, assertions that aren't on, Weiki's process, and `powerd` are left out
   - a process with both kinds reads as keeping the display on
@@ -14,7 +14,7 @@
   - the order follows `localizedStandardCompare`
 
   Then implement it (design Decision 2). Verify that `make test` passes.
-- [ ] 2.2 Write the serialized integration test first: a hold made with `SystemPowerAssertions` shows up in `processAssertions()` under this process, with its type, name, and level on. Then implement `processAssertions()` and the process naming (design Decision 3). Verify that `make test` passes.
+- [x] 2.2 Write the serialized integration test first: a hold made with `SystemPowerAssertions` shows up in `assertionsByProcess()` under this process, with its type, name, and level on. Then implement `assertionsByProcess()`, with names taken from the assertions (design Decision 3). Verify that `make test` passes.
 
 ## 3. The menu section
 

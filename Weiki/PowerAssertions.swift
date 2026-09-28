@@ -39,3 +39,53 @@ struct SystemPowerAssertions: PowerAssertionService {
         _ = IOPMAssertionRelease(id)
     }
 }
+
+/// What an assertion does toward keeping the Mac awake.
+enum AssertionEffect {
+    case keepsDisplayOn
+    case keepsMacAwake
+}
+
+/// What one process's assertions keep awake, and the process name the system recorded.
+struct ProcessAssertions: Equatable {
+    let processName: String?
+    let effects: [AssertionEffect]
+}
+
+extension SystemPowerAssertions {
+    /// Every process's assertions that are on and keep the Mac awake, by process ID. Processes
+    /// with none are left out. Any process may read this.
+    static func assertionsByProcess() -> [pid_t: ProcessAssertions] {
+        var byProcess: Unmanaged<CFDictionary>?
+        guard IOPMCopyAssertionsByProcess(&byProcess) == kIOReturnSuccess,
+              let assertionsByProcess = byProcess?.takeRetainedValue() as? [NSNumber: [[String: Any]]] else { return [:] }
+        var result: [pid_t: ProcessAssertions] = [:]
+        for (process, assertions) in assertionsByProcess {
+            let effects = assertions.compactMap { assertion -> AssertionEffect? in
+                guard (assertion[kIOPMAssertionLevelKey] as? NSNumber)?.uint32Value == IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                      let type = assertion[kIOPMAssertionTypeKey] as? String else { return nil }
+                return effect(ofType: type)
+            }
+            guard !effects.isEmpty else { continue }
+            // Each assertion carries its process's name under this key, which IOPMLib.h doesn't
+            // declare; it's what `pmset -g assertions` shows, even for processes owned by root.
+            let processName = assertions.first?["Process Name"] as? String
+            result[process.int32Value] = ProcessAssertions(processName: processName, effects: effects)
+        }
+        return result
+    }
+
+    /// What an assertion of `type` keeps awake, or nil for types that don't keep the Mac from
+    /// idle-sleeping, including macOS's own bookkeeping (`Internal…`, `UserIsActive`).
+    static func effect(ofType type: String) -> AssertionEffect? {
+        switch type {
+        case kIOPMAssertPreventUserIdleDisplaySleep, kIOPMAssertionTypeNoDisplaySleep:
+            .keepsDisplayOn
+        case kIOPMAssertPreventUserIdleSystemSleep, kIOPMAssertionTypeNoIdleSleep,
+             kIOPMAssertionTypePreventSystemSleep, kIOPMAssertNetworkClientActive:
+            .keepsMacAwake
+        default:
+            nil
+        }
+    }
+}

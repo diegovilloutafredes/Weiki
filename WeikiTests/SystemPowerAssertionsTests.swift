@@ -64,6 +64,25 @@ struct SystemPowerAssertionsTests {
         #expect(hold["TimeoutSeconds"] == nil)
     }
 
+    /// The read behind "Also Keeping the Mac Awake" finds a hold under its process, with what
+    /// it keeps awake and the process's name.
+    @Test func assertionsByProcessFindsThisProcesssHold() throws {
+        let id = try service.acquire(keepsDisplayOn: true, timeout: 0, details: "Display kept on, indefinitely")
+        defer { service.release(id) }
+
+        let own = SystemPowerAssertions.assertionsByProcess()[getpid()]
+        #expect(own == ProcessAssertions(processName: ProcessInfo.processInfo.processName, effects: [.keepsDisplayOn]))
+    }
+
+    @Test func assertionsByProcessLeavesOutReleasedHolds() throws {
+        let id = try service.acquire(keepsDisplayOn: false, timeout: 0, details: "Display allowed to sleep, indefinitely")
+        #expect(SystemPowerAssertions.assertionsByProcess()[getpid()]?.effects == [.keepsMacAwake])
+
+        service.release(id)
+
+        #expect(SystemPowerAssertions.assertionsByProcess()[getpid()] == nil)
+    }
+
     @Test func releaseRemovesTheHold() throws {
         let id = try service.acquire(keepsDisplayOn: false, timeout: 0, details: "Display allowed to sleep, indefinitely")
         #expect(heldAssertions().count == 1)
