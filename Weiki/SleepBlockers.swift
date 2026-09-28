@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Observation
 
 /// A process keeping the Mac awake, as the menu lists it.
@@ -10,9 +10,28 @@ struct SleepBlocker: Hashable, Identifiable {
 }
 
 /// The other processes keeping the Mac awake, for the "Also Keeping the Mac Awake" section.
+///
+/// It refreshes each time a menu opens, because a `.menu`-style menu only re-renders when
+/// observed state changes and nothing announces a change in the system's assertions.
 @Observable
 final class SleepBlockers {
     private(set) var list: [SleepBlocker] = []
+
+    init() {
+        refresh()
+        // Lives as long as the app, so the observer is never removed.
+        _ = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+    }
+
+    private func refresh() {
+        list = Self.list(
+            from: SystemPowerAssertions.assertionsByProcess(),
+            appName: { NSRunningApplication(processIdentifier: $0)?.localizedName },
+            excluding: ProcessInfo.processInfo.processIdentifier
+        )
+    }
 
     /// One item per name, sorted the way Finder sorts. A process goes by its app's name when it
     /// has one (`appName`), and otherwise by its process name. Leaves out `ownProcess` and

@@ -18,12 +18,14 @@
 
 ## 3. The menu section
 
-- [ ] 3.1 Add the `SleepBlockers` model, its refresh (design Decisions 1 and 4), and the "Also Keeping the Mac Awake" section. Verify with `make run`, System Events, and `caffeinate` every scenario in `specs/other-sleep-blockers`:
+- [x] 3.1 Add the `SleepBlockers` model, its refresh (design Decisions 1 and 4), and the "Also Keeping the Mac Awake" section. Verify with `make run`, System Events, and `caffeinate` every scenario in `specs/other-sleep-blockers`:
   - `caffeinate -i` and `caffeinate -d` read correctly
   - two `caffeinate -i` runs show one item
   - the section is absent with only the system's bookkeeping, and during a Weiki session with nothing else running
   - a `caffeinate` started or ended since the menu last opened is current at the next opening
-- [ ] 3.2 Add the section, the refresh on open, and the counting rule to the project notes, and a line to the README's Features. Verify that the text matches the code and that both pre-push checks print nothing.
+
+  Checked on the installed build. Two outside `caffeinate -i` runs showed as one "caffeinate — keeps the Mac awake". Adding a `caffeinate -d` changed it to "keeps the display on" at the next opening, and it changed back once that exited. A Weiki session didn't list Weiki, and `powerd`, `WindowServer`, `dasd`'s short-lived hold, and the `mds_stores` background task never showed. The "only bookkeeping" case couldn't be set up live, because the outside `caffeinate` runs kept going (they weren't mine to stop), so it rests on the unit tests.
+- [x] 3.2 Add the section, the refresh on open, and the counting rule to the project notes, and a line to the README's Features. Verify that the text matches the code and that both pre-push checks print nothing.
 
 ## 4. Integration
 

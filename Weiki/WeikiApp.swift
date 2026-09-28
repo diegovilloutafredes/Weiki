@@ -6,6 +6,7 @@ struct WeikiApp: App {
     @State private var notifications: EndNotifications
     @State private var today = Today()
     @State private var runningApps = RunningApps()
+    @State private var sleepBlockers = SleepBlockers()
     @State private var loginItem = LoginItem()
 
     init() {
@@ -22,6 +23,7 @@ struct WeikiApp: App {
                 controller: controller,
                 today: today,
                 runningApps: runningApps,
+                sleepBlockers: sleepBlockers,
                 notifications: notifications,
                 loginItem: loginItem
             )

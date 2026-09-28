@@ -12,6 +12,7 @@ Weiki is a small macOS menu bar app that does what `caffeinate` does, from a men
 - **Until an app quits.** Pick a running app, and the Mac stays awake until that app quits, even if it crashes. Useful for a long build, render, or download.
 - **Only on AC power.** Turn it on and a session pauses while the Mac runs on battery, then picks up again when you plug it back in.
 - **Notify when time's up.** Turn it on and Weiki posts a notification when a timed session runs out.
+- **See what else keeps the Mac awake.** The menu lists the other apps and processes keeping the Mac awake, such as a video call or a `caffeinate`, and whether they keep the display on.
 - **Nothing left behind.** A session ends on time, even if the Mac slept past the end, and quitting Weiki releases its hold right away.
 - **Launch at Login.** Off until you turn it on in the menu; the checkmark always matches System Settings.
 

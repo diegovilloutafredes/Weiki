@@ -6,6 +6,7 @@ struct MenuContent: View {
     @Bindable var controller: AwakeController
     let today: Today
     let runningApps: RunningApps
+    let sleepBlockers: SleepBlockers
     let notifications: EndNotifications
     let loginItem: LoginItem
     @Environment(\.openWindow) private var openWindow
@@ -15,6 +16,17 @@ struct MenuContent: View {
         Text(controller.state.statusLine(now: today.date))
         if controller.state != .off {
             Button("Turn Off") { controller.stop() }
+        }
+        if !sleepBlockers.list.isEmpty {
+            Section("Also Keeping the Mac Awake") {
+                ForEach(sleepBlockers.list) { blocker in
+                    if blocker.keepsDisplayOn {
+                        Text("\(blocker.name) — keeps the display on")
+                    } else {
+                        Text("\(blocker.name) — keeps the Mac awake")
+                    }
+                }
+            }
         }
         // A menu Section brings its own separators.
         Section("Keep Awake For") {
