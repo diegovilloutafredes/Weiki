@@ -19,18 +19,17 @@ final class SleepBlockers {
 
     init() {
         refresh()
-        // Lives as long as the app, so the observer is never removed.
-        _ = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
-        }
+        refreshWhenAMenuOpens { [weak self] in self?.refresh() }
     }
 
+    /// Writes only a changed list, so an unchanged one doesn't re-render the menu.
     private func refresh() {
-        list = Self.list(
+        let list = Self.list(
             from: SystemPowerAssertions.assertionsByProcess(),
             appName: { NSRunningApplication(processIdentifier: $0)?.localizedName },
             excluding: ProcessInfo.processInfo.processIdentifier
         )
+        if list != self.list { self.list = list }
     }
 
     /// One item per name, sorted the way Finder sorts. A process goes by its app's name when it

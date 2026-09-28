@@ -14,15 +14,17 @@
 
 ## 2. The actions
 
-- [x] 2.1 Write the `ShortcutActions` tests first, with the recording power-assertion fake and a test controller:
+- [x] 2.1 Write the `ShortcutActions` tests first, with a controller built on the recording power-assertion fake:
   - no duration starts an indefinite session and selects `.indefinitely`
-  - 15 minutes, 1 hour, and 2 hours select their presets, and 45 minutes selects `.custom`
-  - durations under 1 minute or over 24 hours throw and leave the state unchanged
+  - 15 minutes, 1 hour, and 2 hours select their presets, and other durations from 1 minute to 24 hours select `.custom`
   - an action replaces an active session
+  - durations under 1 minute or over 24 hours throw and leave the active session as it was
   - an app that isn't running throws an error that names it, and changes nothing
+  - a refused hold makes the action throw, so it never reports a session that isn't there
+  - `RunningApps.newestInstance(of:among:)` finds the newest running copy of an app, with or without a Dock icon
   - ("Turn Off Weiki" is `stop()`, and the status action returns `state.isHolding`, both covered by the controller tests.)
 
-  Then implement `ShortcutActions` and `WeikiIntentError` (design Decisions 1 and 5). Verify that `make test` passes.
+  Then implement `ShortcutActions` and `ShortcutError` (design Decisions 1 and 5). Verify that `make test` passes.
 - [ ] 2.2 Add the four intents, `RunningAppEntity` with its query, and `WeikiShortcuts` (design Decisions 4 to 6). Verify in the Shortcuts app, with `pmset -g assertions`, every scenario in `specs/shortcuts-actions` that doesn't need Siri: each action and its result, the error messages, the suggested apps, and a saved shortcut still naming an app after the app quits.
 
   Done so far:
@@ -39,4 +41,14 @@
 
 ## 3. Integration
 
-- [ ] 3.1 Run `make clean generate test run`, then walk through the scenarios again against the installed build. Verify that `openspec validate add-shortcuts-actions --strict` succeeds, and that `make build` and `make test` pass with no warnings.
+- [x] 3.1 Run `make clean generate test run`, then walk through the scenarios again against the installed build. Verify that `openspec validate add-shortcuts-actions --strict` succeeds, and that `make build` and `make test` pass with no warnings.
+
+  After a clean build, the installed app's metadata lists the four actions, Shortcuts' library finds them, and the menu and sessions work as before. Running the actions in Shortcuts is covered by the manual tasks 1.2, 2.2, and 2.3. A code review of this change found ten points, and all are fixed:
+  - an action fails when no session is on afterwards
+  - saved apps always resolve, with their proper name
+  - the newest running copy is used, with or without a Dock icon
+  - suggestions don't repeat
+  - the lookups are shared
+  - the empty-duration summary reads correctly
+  - the tests cover the controller-level cases
+  - the design matches the code

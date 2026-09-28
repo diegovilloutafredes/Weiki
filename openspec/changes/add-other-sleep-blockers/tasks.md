@@ -29,4 +29,6 @@
 
 ## 4. Integration
 
-- [ ] 4.1 Run `make clean generate test run`, walk through the scenarios again, and review the new Swift code, fixing the confirmed findings. Verify that `openspec validate add-other-sleep-blockers --strict` succeeds and that `make build` and `make test` pass with no warnings.
+- [x] 4.1 Run `make clean generate test run`, walk through the scenarios again, and review the new Swift code, fixing the confirmed findings. Verify that `openspec validate add-other-sleep-blockers --strict` succeeds and that `make build` and `make test` pass with no warnings.
+
+  Reviewed along with the Shortcuts actions. The fixes from that review: the list is written only when it changes, and both lists share one refresh-on-open helper (`refreshWhenAMenuOpens`).

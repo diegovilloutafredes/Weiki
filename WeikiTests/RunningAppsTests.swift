@@ -8,6 +8,7 @@ struct RunningAppsTests {
         let localizedName: String?
         var bundleIdentifier: String?
         let activationPolicy: NSApplication.ActivationPolicy
+        var launchDate: Date?
     }
 
     /// Only apps with a Dock icon, in the order Finder sorts names (so "iTerm2" comes before
@@ -36,5 +37,28 @@ struct RunningAppsTests {
         ])
 
         #expect(apps.map(\.processIdentifier).sorted() == [11, 12])
+    }
+
+    // MARK: - An app a shortcut names
+
+    /// A shortcut names an app by bundle identifier; any running copy counts, with or without a
+    /// Dock icon, and the one launched last wins.
+    @Test func findsTheNewestRunningCopyOfAnApp() {
+        let now = Date()
+        let apps = [
+            App(processIdentifier: 30, localizedName: "Keynote", bundleIdentifier: "com.apple.iWork.Keynote", activationPolicy: .regular, launchDate: now - 60),
+            App(processIdentifier: 31, localizedName: "Keynote", bundleIdentifier: "com.apple.iWork.Keynote", activationPolicy: .accessory, launchDate: now),
+            App(processIdentifier: 32, localizedName: "Safari", bundleIdentifier: "com.apple.Safari", activationPolicy: .regular, launchDate: now + 60),
+        ]
+
+        let keynote = RunningApps.newestInstance(of: "com.apple.iWork.Keynote", among: apps)
+
+        #expect(keynote == WatchedApp(processIdentifier: 31, name: "Keynote", bundleIdentifier: "com.apple.iWork.Keynote"))
+    }
+
+    @Test func findsNothingForAnAppThatIsntRunning() {
+        let apps = [App(processIdentifier: 32, localizedName: "Safari", bundleIdentifier: "com.apple.Safari", activationPolicy: .regular)]
+
+        #expect(RunningApps.newestInstance(of: "com.apple.iWork.Keynote", among: apps) == nil)
     }
 }

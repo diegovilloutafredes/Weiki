@@ -3,9 +3,32 @@ import Testing
 @testable import Weiki
 
 /// What the Shortcuts actions start, apart from the App Intents glue.
-struct ShortcutActionsTests {
+@Suite final class ShortcutActionsTests {
+    private let suiteName = "WeikiTests-\(UUID().uuidString)"
+    private let service = RecordingPowerAssertions()
+    private let controller: AwakeController
+    private let keynote = WatchedApp(processIdentifier: 502, name: "Keynote", bundleIdentifier: "com.apple.iWork.Keynote")
+
+    init() {
+        controller = AwakeController(
+            service: service,
+            defaults: UserDefaults(suiteName: suiteName)!,
+            appWatcher: FakeAppQuitWatcher(),
+            powerSource: FakePowerSource()
+        )
+    }
+
+    deinit {
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
+    }
+
+    // MARK: - Keep Mac Awake
+
     @Test func noDurationKeepsTheMacAwakeIndefinitely() throws {
-        #expect(try ShortcutActions.option(forSeconds: nil) == .indefinitely)
+        try ShortcutActions.keepAwake(forSeconds: nil, on: controller)
+
+        #expect(controller.state == .on(until: .never, paused: false))
+        #expect(controller.activeOption == .indefinitely)
     }
 
     /// The menu's presets are checked when a shortcut asks for their exact length.
@@ -18,39 +41,67 @@ struct ShortcutActionsTests {
         (86_400, .custom(86_400)),
     ])
     func durationsFromOneMinuteToADay(seconds: TimeInterval, option: DurationOption) throws {
-        #expect(try ShortcutActions.option(forSeconds: seconds) == option)
+        try ShortcutActions.keepAwake(forSeconds: seconds, on: controller)
+
+        #expect(controller.activeOption == option)
+    }
+
+    @Test func anActionReplacesTheActiveSession() throws {
+        controller.start(.oneHour)
+
+        try ShortcutActions.keepAwake(forSeconds: nil, on: controller)
+
+        #expect(controller.activeOption == .indefinitely)
+        #expect(service.heldIDs == [2])
     }
 
     @Test(arguments: [0.0, 59, 86_401, -60])
-    func durationsOutsideOneMinuteToADayAreRefused(seconds: TimeInterval) {
+    func durationsOutsideOneMinuteToADayChangeNothing(seconds: TimeInterval) {
+        controller.start(.oneHour)
+        let session = controller.state
+
         #expect(throws: ShortcutError.durationOutOfRange) {
-            try ShortcutActions.option(forSeconds: seconds)
+            try ShortcutActions.keepAwake(forSeconds: seconds, on: controller)
         }
+        #expect(controller.state == session)
+        #expect(controller.activeOption == .oneHour)
     }
 
-    @Test func aRunningAppIsFoundByItsBundleIdentifier() throws {
-        let keynote = WatchedApp(processIdentifier: 502, name: "Keynote", bundleIdentifier: "com.apple.iWork.Keynote")
-        let safari = WatchedApp(processIdentifier: 503, name: "Safari", bundleIdentifier: "com.apple.Safari")
+    /// A shortcut must never report a session that isn't there, or an automation would carry on
+    /// while the Mac sleeps.
+    @Test func aRefusedHoldFailsTheAction() {
+        service.refusesHolds = true
 
-        let option = try ShortcutActions.option(untilQuit: "com.apple.iWork.Keynote", named: "Keynote", among: [safari, keynote])
-
-        #expect(option == .untilQuit(keynote))
+        #expect(throws: ShortcutError.couldNotStart) {
+            try ShortcutActions.keepAwake(forSeconds: 3600, on: controller)
+        }
+        #expect(controller.state == .off)
     }
 
-    @Test func anAppThatIsntRunningIsRefusedByName() {
-        let safari = WatchedApp(processIdentifier: 503, name: "Safari", bundleIdentifier: "com.apple.Safari")
+    // MARK: - Keep Mac Awake Until App Quits
+
+    @Test func aRunningAppIsWatched() throws {
+        try ShortcutActions.keepAwake(until: keynote, named: "Keynote", on: controller)
+
+        #expect(controller.state == .on(until: .appQuits(keynote), paused: false))
+    }
+
+    @Test func anAppThatIsntRunningFailsByNameAndChangesNothing() {
+        controller.start(.oneHour)
+        let session = controller.state
 
         #expect(throws: ShortcutError.appNotRunning("Keynote")) {
-            try ShortcutActions.option(untilQuit: "com.apple.iWork.Keynote", named: "Keynote", among: [safari])
+            try ShortcutActions.keepAwake(until: nil, named: "Keynote", on: controller)
         }
+        #expect(controller.state == session)
     }
 
     /// Shortcuts shows these messages when an action fails.
-    @Test func errorMessagesSayWhatToDo() {
-        let tooLong = String(localized: ShortcutError.durationOutOfRange.localizedStringResource)
+    @Test func errorMessagesSayWhatWentWrong() {
+        let outOfRange = String(localized: ShortcutError.durationOutOfRange.localizedStringResource)
         let notRunning = String(localized: ShortcutError.appNotRunning("Keynote").localizedStringResource)
 
-        #expect(tooLong.contains("1 minute") && tooLong.contains("24 hours"))
+        #expect(outOfRange.contains("1 minute") && outOfRange.contains("24 hours"))
         #expect(notRunning.contains("Keynote"))
     }
 }

@@ -16,14 +16,18 @@ struct KeepMacAwakeIntent: AppIntent {
     var duration: Measurement<UnitDuration>?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Keep Mac awake for \(\.$duration)")
+        When(\.$duration, .hasAnyValue) {
+            Summary("Keep Mac awake for \(\.$duration)")
+        } otherwise: {
+            Summary("Keep Mac awake indefinitely, or for \(\.$duration)")
+        }
     }
 
     @Dependency private var controller: AwakeController
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        controller.start(try ShortcutActions.option(forSeconds: duration?.converted(to: .seconds).value))
+        try ShortcutActions.keepAwake(forSeconds: duration?.converted(to: .seconds).value, on: controller)
         return .result(dialog: "\(controller.state.statusLine(now: .now))")
     }
 }
@@ -46,8 +50,8 @@ struct KeepMacAwakeUntilAppQuitsIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let runningApps = RunningApps.dockApps(from: NSWorkspace.shared.runningApplications)
-        controller.start(try ShortcutActions.option(untilQuit: app.id, named: app.name, among: runningApps))
+        let runningCopy = RunningApps.newestInstance(of: app.id, among: NSWorkspace.shared.runningApplications)
+        try ShortcutActions.keepAwake(until: runningCopy, named: app.name, on: controller)
         return .result(dialog: "\(controller.state.statusLine(now: .now))")
     }
 }
@@ -96,22 +100,26 @@ struct RunningAppEntity: AppEntity {
 }
 
 struct RunningAppQuery: EntityQuery {
-    /// The running apps with a Dock icon, as the menu's submenu lists them.
+    /// The running apps with a Dock icon, as the menu's submenu lists them, once each.
     @MainActor
     func suggestedEntities() async throws -> [RunningAppEntity] {
-        RunningApps.dockApps(from: NSWorkspace.shared.runningApplications).compactMap { app in
-            app.bundleIdentifier.map { RunningAppEntity(id: $0, name: app.name) }
+        var suggested = Set<String>()
+        return RunningApps.dockApps(from: NSWorkspace.shared.runningApplications).compactMap { app in
+            guard let id = app.bundleIdentifier, suggested.insert(id).inserted else { return nil }
+            return RunningAppEntity(id: id, name: app.name)
         }
     }
 
-    /// Apps a shortcut saved, named from where they're installed, so one that isn't running
-    /// still shows its name.
+    /// The apps saved shortcuts name. Each one resolves, even when it isn't running or
+    /// installed, so the action can say which app isn't running.
     @MainActor
     func entities(for identifiers: [String]) async throws -> [RunningAppEntity] {
-        identifiers.compactMap { id in
-            NSWorkspace.shared.urlForApplication(withBundleIdentifier: id).map {
-                RunningAppEntity(id: id, name: FileManager.default.displayName(atPath: $0.path))
-            }
+        let runningApps = NSWorkspace.shared.runningApplications
+        return identifiers.map { id in
+            let name = RunningApps.newestInstance(of: id, among: runningApps)?.name
+                ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.deletingPathExtension().lastPathComponent
+                ?? id
+            return RunningAppEntity(id: id, name: name)
         }
     }
 }

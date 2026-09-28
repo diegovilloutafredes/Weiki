@@ -7,7 +7,7 @@ Lets people start, stop, and check Weiki sessions from Shortcuts, Siri, and Spot
 ## ADDED Requirements
 
 ### Requirement: Keep Mac Awake action
-The Shortcuts app SHALL offer a "Keep Mac Awake" action with an optional duration. Without a duration, the action SHALL start an indefinite session. With a duration from 1 minute to 24 hours, it SHALL start a timed session of that length. The action SHALL replace any active session. The session SHALL follow "Keep Display On" and "Only on AC Power" exactly as a session started from the menu does. The menu SHALL check "Indefinitely" for an indefinite session, the matching preset for 15 minutes, 1 hour, or 2 hours, and "Custom…" for any other duration.
+The Shortcuts app SHALL offer a "Keep Mac Awake" action with an optional duration. Without a duration, the action SHALL start an indefinite session. With a duration from 1 minute to 24 hours, it SHALL start a timed session of that length. The action SHALL replace any active session. The session SHALL follow "Keep Display On" and "Only on AC Power" exactly as a session started from the menu does. If no session is on afterwards, because macOS refused to keep the Mac awake, the action SHALL fail rather than report success. The menu SHALL check "Indefinitely" for an indefinite session, the matching preset for 15 minutes, 1 hour, or 2 hours, and "Custom…" for any other duration.
 
 #### Scenario: Keeping the Mac awake for an hour
 - **WHEN** a shortcut runs "Keep Mac Awake" with a duration of 1 hour at 14:00
@@ -21,6 +21,11 @@ The Shortcuts app SHALL offer a "Keep Mac Awake" action with an optional duratio
 #### Scenario: Another duration
 - **WHEN** a shortcut runs "Keep Mac Awake" with a duration of 45 minutes
 - **THEN** a session ending 45 minutes later is active and "Custom…" is checked
+
+#### Scenario: macOS refuses to keep the Mac awake
+- **WHEN** a shortcut runs "Keep Mac Awake" and the system refuses the hold
+- **THEN** the action fails with a message saying Weiki couldn't keep the Mac awake
+- **AND** no session is active
 
 #### Scenario: A duration out of range
 - **WHEN** a shortcut runs "Keep Mac Awake" with a duration shorter than 1 minute or longer than 24 hours

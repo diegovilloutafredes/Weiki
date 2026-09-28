@@ -24,34 +24,35 @@ Facts established before writing this design (App Intents documentation):
 
 ## Decisions
 
-### 1. Thin intents over pure decisions
-`ShortcutActions` holds the decisions as pure functions that return the `DurationOption` to start, or throw a typed `ShortcutError`:
-- `option(forSeconds:)`: nil means `.indefinitely`, the range is 60 seconds to 24 hours, the three presets match exactly, and anything else is `.custom`.
-- `option(untilQuit:named:among:)`: finds a running app by bundle identifier, or throws `.appNotRunning(name)`.
+### 1. Thin intents over tested functions
+`ShortcutActions` holds what each action does:
+- `keepAwake(forSeconds:on:)` checks the duration first: nil means `.indefinitely`, the range is 60 seconds to 24 hours, the three presets match exactly, and anything else is `.custom`.
+- `keepAwake(until:named:on:)` fails with the app's name when it gets no running copy.
 
-Each intent reads the controller through `@Dependency`, calls `controller.start(try …)` (or `stop()`), and answers with the status line. "Is Weiki Keeping the Mac Awake?" returns `state.isHolding`. Unit tests call `ShortcutActions` directly and never go through `@Dependency`, because the test host is Weiki itself and has already registered the real controller. `stop()` and `isHolding` are covered by the controller tests.
+Both then start the session and fail with `.couldNotStart` if no session is on afterwards: macOS refused the hold, or the app quit meanwhile. This way a shortcut never reports a session that isn't there, and an automation can't carry on while the Mac sleeps. A paused session counts as on. Because the input is checked first, a failed action leaves the session as it was.
 
-`WatchedApp` gains an optional `bundleIdentifier`, which `RunningApps.dockApps(from:)` fills in, so a shortcut can find an app again in a later launch.
-- *Alternative:* an extension on `AwakeController` with `keepAwake(for:)` and so on. Rejected: it would mix the input rules with the session, and each test would need a controller.
+Each intent reads the controller through `@Dependency`, calls one of these (or `stop()`), and answers with the status line. "Is Weiki Keeping the Mac Awake?" returns `state.isHolding`. The unit tests call `ShortcutActions` with a controller built on fakes. They never go through `@Dependency`, because the test host is Weiki itself and has already registered the real controller.
+- *Alternative:* the logic inside `perform()`. Rejected, because it can't be tested without the App Intents runtime.
 
 ### 2. Sharing the controller
-`WeikiApp.init` creates the controller and `RunningApps`, stores them in its `@State` (through `State(initialValue:)`), and registers the same instances with `AppDependencyManager`. There is one controller, so the menu and the actions always agree.
+`WeikiApp.init` creates the controller, stores it in its `@State` (through `State(initialValue:)`), and registers the same instance with `AppDependencyManager`. There is one controller, so the menu and the actions always agree. Nothing else is registered: the actions read running apps from `NSWorkspace` when they run.
 
 ### 3. How the intents run
 They use the default mode: no `openAppWhenRun` and no `supportedModes`. The system runs them in Weiki's process and launches Weiki first if it isn't running. As a menu bar agent it opens no window, which matches the spec. Setting `supportedModes` would need an availability check, because it only exists from macOS 26, and it isn't needed.
 
 ### 4. The app parameter
-`RunningAppEntity` uses the bundle identifier as its ID and the app's name as its display name.
-- `suggestedEntities()` returns the running Dock apps from `RunningApps`.
-- `entities(for:)` resolves IDs to running apps and keeps the stored name for apps that aren't running, so a saved shortcut still shows "Keynote".
-- When the action runs, the app must be running, or `perform()` throws "Keynote isn't running."
-
-Only running apps can be picked while editing a shortcut. That's enough for the main automation, "When Keynote opens → Keep Mac Awake Until App Quits: Keynote", which is set up while Keynote is open. Searching installed apps is an open question.
+`RunningAppEntity` uses the bundle identifier as its ID, so a saved shortcut finds the app again in a later launch. `WatchedApp` carries the bundle identifier for this.
+- `suggestedEntities()` lists the running apps with a Dock icon, once per bundle identifier, as the submenu does.
+- `entities(for:)` always resolves an ID. The name comes from the newest running copy, otherwise from the installed app's file name without ".app", otherwise the ID itself. It doesn't use `FileManager.displayName`, which would read "Keynote.app" when Finder shows extensions.
+- When the action runs, `RunningApps.newestInstance(of:among:)` finds the running copy launched last, with or without a Dock icon. That covers an app that hides its Dock icon, and an automation that fires as the app opens. If there is none, the action fails with "Keynote isn't running."
 
 ### 5. Errors and results
-- **Errors:** a `WeikiIntentError` enum that conforms to `CustomLocalizedStringResourceConvertible`, with two messages: "Choose a duration from 1 minute to 24 hours." and "\(app) isn't running."
-- **Results:** every action returns a dialog with the status line after it runs ("Awake until 15:00", "Weiki is off"). The status action also returns `ReturnsValue<Bool>`, so it can drive an "If" in Shortcuts.
-- **Duration parameter:** a `Measurement<UnitDuration>`, the type the Shortcuts editor shows as a duration picker.
+- **Errors:** `ShortcutError` conforms to `CustomLocalizedStringResourceConvertible`, so Shortcuts shows its message:
+  - "Choose a duration from 1 minute to 24 hours."
+  - "\(app) isn't running."
+  - "Weiki couldn't keep the Mac awake."
+- **Results:** every action returns a dialog with the status line. The status action also returns `ReturnsValue<Bool>`, so it can drive an "If" in Shortcuts.
+- **Duration parameter:** a `Measurement<UnitDuration>`. Its summary reads "Keep Mac awake for 30 min" when it's set, and "Keep Mac awake indefinitely, or for Duration" when it's empty.
 
 ### 6. Phrases
 `WeikiShortcuts: AppShortcutsProvider` offers three App Shortcuts:
