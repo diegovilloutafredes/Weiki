@@ -70,6 +70,7 @@ Each gets a short title and an SF Symbol: `cup.and.saucer.fill`, `cup.and.saucer
 
 ## Open Questions
 
+- *Answered (a spike for task 1.2):* the project's default main-actor isolation is no problem. A plain `struct TurnOffWeikiIntent: AppIntent` with `@Dependency private var controller: AwakeController` and a `@MainActor` `perform()` built with no warnings, so no `nonisolated` is needed. Xcode wrote `Metadata.appintents/extract.actionsdata` into the bundle, listing the action as "Turn Off Weiki" with `openAppWhenRun: false`, and XcodeGen needs no settings for it.
 - Searching installed apps (not just running ones) for the app parameter.
 - A "Set Keep Display On" action, if automations turn out to need one.
 - *Answered:* Apple's App Intents Testing framework can't replace task 2.2's manual checks yet. It needs macOS 27 and Xcode 27, and it runs from a UI-test target that launches the app (`XCUIApplication` plus `IntentDefinitions(bundleIdentifier:)`). CI builds with Xcode 26.5, so the logic stays in `ShortcutActions`, with plain unit tests.
