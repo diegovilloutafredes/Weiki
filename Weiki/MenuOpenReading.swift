@@ -16,6 +16,11 @@ final class MenuOpenReading<Value: Equatable> {
         observeForever(NSMenu.didBeginTrackingNotification) { [weak self] in self?.refresh() }
     }
 
+    // Written out, though empty, because Swift 6.3's optimizer crashes on the deinit it
+    // generates for a generic class under default main-actor isolation. CI's Xcode 26.5 has
+    // Swift 6.3; this can go once CI moves to Swift 6.4.
+    deinit {}
+
     /// Writes only a changed value, so an unchanged reading doesn't re-render the menu.
     private func refresh() {
         let value = read()
